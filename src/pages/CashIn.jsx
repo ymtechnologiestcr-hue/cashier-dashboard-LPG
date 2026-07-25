@@ -23,7 +23,7 @@ function CashIn() {
   const [activeTab, setActiveTab] = useState('driver-collections');
   const [driverCollections, setDriverCollections] = useState([]);
   const [driverLoading, setDriverLoading] = useState(true);
-  const [selectedDriverId, setSelectedDriverId] = useState(null);
+  const [selectedDriverDetails, setSelectedDriverDetails] = useState(null);
   const [collectionHistory, setCollectionHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
@@ -45,6 +45,12 @@ function CashIn() {
   const [salesFile, setSalesFile] = useState(null);
   const [officeSaleMessage, setOfficeSaleMessage] = useState('');
   const [officeSaleError, setOfficeSaleError] = useState('');
+
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [productCatalog, setProductCatalog] = useState([]);
+  const [productCatalogSearch, setProductCatalogSearch] = useState('');
+  const [productCatalogTab, setProductCatalogTab] = useState('All');
+  const [tempSelectedProducts, setTempSelectedProducts] = useState([]);
 
   const [cashierPenaltyRequests, setCashierPenaltyRequests] = useState([]);
   const [cashierPenaltyLoading, setCashierPenaltyLoading] = useState(false);
@@ -116,6 +122,26 @@ function CashIn() {
     loadCollections();
     loadOfficeSales();
   }, []);
+
+  const loadProductCatalog = async (query = '') => {
+    try {
+      const response = await searchProducts(query);
+      if (response?.success && Array.isArray(response.data)) {
+        setProductCatalog(response.data);
+      } else {
+        setProductCatalog([]);
+      }
+    } catch (error) {
+      console.error('Unable to load product catalog:', error);
+      setProductCatalog([]);
+    }
+  };
+
+  useEffect(() => {
+    if (isProductModalOpen) {
+      loadProductCatalog(productCatalogSearch);
+    }
+  }, [isProductModalOpen, productCatalogSearch]);
 
   const loadCashierPenaltyRequests = async () => {
     setCashierPenaltyLoading(true);
@@ -506,6 +532,7 @@ function CashIn() {
           upi: driver.upi,
           total: driver.total,
           settled: driver.settled || 0,
+          pending: driver.pendingTotal || 0,
           status: driver.status,
           driverId: driver.driver_id,
           pendingCount: driver.pendingCount,
@@ -520,8 +547,8 @@ function CashIn() {
       const response = await verifyDriverCollections(driverId);
       if (response?.success) {
         await loadCollections();
-        if (selectedDriverId === driverId) {
-          setSelectedDriverId(null);
+        if (selectedDriverDetails?.driverId === driverId) {
+          setSelectedDriverDetails(null);
           setCollectionHistory(null);
         }
       }
@@ -530,14 +557,14 @@ function CashIn() {
     }
   };
 
-  const handleViewDriverHistory = async (driverId) => {
-    setSelectedDriverId(driverId);
+  const handleViewDriverHistory = async (driver) => {
+    setSelectedDriverDetails(driver);
     setHistoryError('');
     setHistoryLoading(true);
     setCollectionHistory(null);
 
     try {
-      const response = await getDriverCollectionHistory(driverId, 1, 5);
+      const response = await getDriverCollectionHistory(driver.driverId, 1, 100);
       if (response?.success && response.data) {
         setCollectionHistory(response.data);
       } else {
@@ -739,7 +766,7 @@ function CashIn() {
               {[
                 { id: 'driver-collections', label: 'Driver Collections' },
                 { id: 'office-sales', label: 'Office Sales' },
-                { id: 'cashier-requests', label: 'Cashier Requests' },
+                { id: 'cashier-requests', label: 'Customer Service ' },
                 { id: 'other-receipts', label: 'Other Receipts' },
               ].map((tab) => (
                 <button
@@ -771,6 +798,7 @@ function CashIn() {
                         <th>UPI</th>
                         <th>TOTAL</th>
                         <th>SETTLED</th>
+                        <th>PENDING</th>
                         <th>STATUS</th>
                         <th>ACTION</th>
                       </tr>
@@ -790,6 +818,7 @@ function CashIn() {
                           <td>₹{driver.upi.toLocaleString('en-IN')}</td>
                           <td className="total-cell">₹{driver.total.toLocaleString('en-IN')}</td>
                           <td>₹{driver.settled.toLocaleString('en-IN')}</td>
+                          <td style={{ color: 'red' }}>₹{driver.pending.toLocaleString('en-IN')}</td>
                           <td>
                             <span className={`status-badge ${driver.status.toLowerCase()}`}>
                               {driver.status}
@@ -799,7 +828,7 @@ function CashIn() {
                             <button
                               className="icon-btn"
                               type="button"
-                              onClick={() => handleViewDriverHistory(driver.driverId)}
+                              onClick={() => handleViewDriverHistory(driver)}
                             >
                               👁
                             </button>
@@ -819,33 +848,124 @@ function CashIn() {
                   </table>
                 </div>
 
-                {selectedDriverId && (
-                  <div className="driver-history-panel">
-                    <h3>Collection history</h3>
-                    <p>Driver ID: {selectedDriverId}</p>
-                    {historyLoading ? (
-                      <p>Loading history...</p>
-                    ) : historyError ? (
-                      <p className="error-message">{historyError}</p>
-                    ) : collectionHistory?.items?.length ? (
-                      <div className="history-list">
-                        {collectionHistory.items.map((item) => (
-                          <div key={item.date} className="history-card">
-                            <div className="history-card-header">
-                              <strong>{item.date}</strong>
-                              <span>₹{item.totalAmount.toLocaleString('en-IN')}</span>
+                {selectedDriverDetails && (
+                  <div className="driver-modal-overlay" style={{ zIndex: 1050 }}>
+                    <div className="driver-modal-container" style={{ width: '90%', maxWidth: '850px', padding: 0, overflow: 'hidden' }}>
+                      <div style={{ backgroundColor: '#0052cc', color: '#fff', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            DRIVER SALES DETAILS
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold' }}>
+                              {selectedDriverDetails.initials}
                             </div>
-                            <div className="history-card-body">
-                              <div>Cash: ₹{item.summary.cash.amount.toLocaleString('en-IN')}</div>
-                              <div>UPI: ₹{item.summary.upi.amount.toLocaleString('en-IN')}</div>
-                              <div>Status: {item.summary.cash.status || item.summary.upi.status || 'PENDING_APPROVAL'}</div>
+                            <div>
+                              <h2 style={{ margin: 0, fontSize: '20px' }}>{selectedDriverDetails.name}</h2>
+                              <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>{selectedDriverDetails.cylinders} cylinders</p>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                        <button 
+                          onClick={() => setSelectedDriverDetails(null)}
+                          style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >✕</button>
                       </div>
-                    ) : (
-                      <p>No settled history available for this driver.</p>
-                    )}
+                      
+                      <div style={{ padding: '24px', backgroundColor: '#fff' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '32px' }}>
+                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Cash</div>
+                            <div style={{ fontSize: '18px', fontWeight: 600 }}>₹{selectedDriverDetails.cash.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>UPI</div>
+                            <div style={{ fontSize: '18px', fontWeight: 600 }}>₹{selectedDriverDetails.upi.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Total</div>
+                            <div style={{ fontSize: '18px', fontWeight: 600 }}>₹{selectedDriverDetails.total.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Pending</div>
+                            <div style={{ fontSize: '18px', fontWeight: 600, color: '#e53e3e' }}>₹{selectedDriverDetails.pending.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div style={{ fontSize: '12px', color: '#666' }}>Status</div>
+                            <div><span className={`status-badge ${selectedDriverDetails.status.toLowerCase()}`}>{selectedDriverDetails.status}</span></div>
+                          </div>
+                        </div>
+
+                        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>Sales Breakdown</h3>
+                        <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: '8px' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee', color: '#666', textAlign: 'left' }}>
+                                <th style={{ padding: '12px 16px', fontWeight: 600 }}>BILL #</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600 }}>CUSTOMER</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>DOM</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>COM</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>ITEMS</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>AMOUNT</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>MODE</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {historyLoading ? (
+                                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#666' }}>Loading...</td></tr>
+                              ) : (!collectionHistory?.items || collectionHistory.items.length === 0 || !collectionHistory.items[0].transactions || collectionHistory.items[0].transactions.length === 0) ? (
+                                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#666' }}>No transactions found</td></tr>
+                              ) : (
+                                collectionHistory.items[0].transactions.map((tx, idx) => (
+                                  <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                                    <td style={{ padding: '12px 16px', color: '#0052cc', fontWeight: 500 }}>B-{tx.saleId}</td>
+                                    <td style={{ padding: '12px 16px' }}>{tx.customerName}</td>
+                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tx.domQty || 0}</td>
+                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tx.comQty || 0}</td>
+                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tx.itemsQty || 0}</td>
+                                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, fontSize: '15px' }}>₹{tx.amount.toLocaleString('en-IN')}</td>
+                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                      <span style={{ 
+                                        padding: '2px 8px', 
+                                        borderRadius: '4px', 
+                                        fontSize: '11px', 
+                                        fontWeight: 600,
+                                        backgroundColor: tx.paymentMode === 'CASH' ? '#d4edda' : '#e2e3e5',
+                                        color: tx.paymentMode === 'CASH' ? '#155724' : '#383d41'
+                                      }}>
+                                        {tx.paymentMode === 'CASH' ? 'Cash' : tx.paymentMode}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                            {(collectionHistory?.items && collectionHistory.items.length > 0 && collectionHistory.items[0].transactions && collectionHistory.items[0].transactions.length > 0) && (
+                              <tfoot>
+                                <tr style={{ backgroundColor: '#f9f9f9', borderTop: '1px solid #eee', fontWeight: 600 }}>
+                                  <td colSpan="2" style={{ padding: '12px 16px' }}>Total</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.domQty || 0), 0)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.comQty || 0), 0)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.itemsQty || 0), 0)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '15px' }}>
+                                    ₹{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.amount || 0), 0).toLocaleString('en-IN')}
+                                  </td>
+                                  <td></td>
+                                </tr>
+                              </tfoot>
+                            )}
+                          </table>
+                        </div>
+                      </div>
+                      
+                      <div style={{ borderTop: '1px solid #eee', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#fff' }}>
+                        <button 
+                          onClick={() => setSelectedDriverDetails(null)}
+                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#f0f2f5', color: '#1a1a1a', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                        >Close</button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </section>
@@ -917,57 +1037,61 @@ function CashIn() {
                         />
                       </div>
                       <div className="form-group product-search-group">
-                        <label>Product</label>
-                        <input
-                          type="text"
-                          className="product-search-input"
-                          value={productQuery}
-                          onChange={(event) => handleProductSearch(event.target.value)}
-                          placeholder="Search products... (max 2)"
-                        />
-                        {productResults.length > 0 && (
-                          <div className="search-results">
-                            {productResults.map((product) => (
-                              <button
-                                type="button"
-                                key={product.id}
-                                className="search-item"
-                                onClick={() => handleSelectProduct(product)}
-                              >
-                                <span>{product.name}</span>
-                                <span>₹{Number(product.price || product.sale_price || 0).toLocaleString('en-IN')}</span>
-                              </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <label style={{ margin: 0 }}>Products & Quantity</label>
+                          <button 
+                            type="button" 
+                            className="text-link-btn" 
+                            style={{ color: '#0052cc', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+                            onClick={() => {
+                              setTempSelectedProducts([...selectedProducts]);
+                              setIsProductModalOpen(true);
+                            }}
+                          >
+                            + Select products
+                          </button>
+                        </div>
+                        
+                        {selectedProducts.length === 0 ? (
+                          <div 
+                            className="dashed-add-block" 
+                            style={{ border: '1px dashed #ccc', borderRadius: '8px', padding: '24px', textAlign: 'center', cursor: 'pointer', backgroundColor: '#f9fbfd' }}
+                            onClick={() => {
+                              setTempSelectedProducts([...selectedProducts]);
+                              setIsProductModalOpen(true);
+                            }}
+                          >
+                            <div style={{ fontSize: '24px', color: '#666', marginBottom: '8px' }}>+</div>
+                            <div style={{ color: '#555' }}>Add cylinder / item to sale</div>
+                          </div>
+                        ) : (
+                          <div className="selected-product">
+                            {selectedProducts.map((product) => (
+                              <div key={product.id} className="sales-input-group" style={{ marginBottom: '10px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <strong>{product.name}</strong>
+                                  <button
+                                    type="button"
+                                    className="icon-btn"
+                                    onClick={() => handleRemoveProduct(product.id)}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                                <span className="sales-input-label">
+                                  {product.type === 'COMMERCIAL' ? 'Commercial Qty' : 'Domestic Qty'} · Rate ₹{Number(product.price || 0).toLocaleString('en-IN')}
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={product.quantity}
+                                  onChange={(event) => handleProductQtyChange(product.id, event.target.value)}
+                                />
+                              </div>
                             ))}
                           </div>
                         )}
                       </div>
-                      {selectedProducts.length > 0 && (
-                        <div className="selected-product">
-                          {selectedProducts.map((product) => (
-                            <div key={product.id} className="sales-input-group" style={{ marginBottom: '10px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <strong>{product.name}</strong>
-                                <button
-                                  type="button"
-                                  className="icon-btn"
-                                  onClick={() => handleRemoveProduct(product.id)}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                              <span className="sales-input-label">
-                                {product.type === 'COMMERCIAL' ? 'Commercial Qty' : 'Domestic Qty'} · Rate ₹{Number(product.price || 0).toLocaleString('en-IN')}
-                              </span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={product.quantity}
-                                onChange={(event) => handleProductQtyChange(product.id, event.target.value)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
                       <p className="field-note">Select up to 2 products and enter quantity for each selected domestic/commercial product</p>
                       <div className="form-group">
                         <label>Total Amount</label>
@@ -1166,12 +1290,40 @@ function CashIn() {
                         {isNewConnectionType ? (
                           <div className="form-field">
                             <label>Products</label>
-                            <input
-                              type="text"
-                              value={selectedNewConnectionRequest?.productDetails || ''}
-                              placeholder="Requested products will appear here"
-                              readOnly
-                            />
+                            {selectedNewConnectionRequest?.products && selectedNewConnectionRequest.products.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                                {selectedNewConnectionRequest.products.map(product => (
+                                  <div 
+                                    key={product.id} 
+                                    style={{ 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '6px',
+                                      backgroundColor: '#e6f4ea', 
+                                      color: '#137333', 
+                                      padding: '6px 12px', 
+                                      borderRadius: '16px', 
+                                      fontSize: '13px', 
+                                      fontWeight: 500,
+                                      border: '1px solid #ceead6'
+                                    }}
+                                  >
+                                    <span>{product.name}</span>
+                                    <span style={{ fontSize: '11px', opacity: 0.8, backgroundColor: 'rgba(19, 115, 51, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                      {product.type}
+                                    </span>
+                                    <span style={{ fontWeight: 600 }}>₹{product.price}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={selectedNewConnectionRequest?.productDetails || ''}
+                                placeholder="Requested products will appear here"
+                                readOnly
+                              />
+                            )}
                           </div>
                         ) : null}
 
@@ -1259,6 +1411,19 @@ function CashIn() {
                               readOnly={!!selectedCashierRequest}
                             />
                           </div>
+                          {isNewConnectionType && (
+                            <div className="form-field">
+                              <label>Deposit Amount</label>
+                              <input
+                                type="number"
+                                value={selectedNewConnectionRequest?.depositAmount ?? ''}
+                                readOnly
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="form-row">
                           <div className="form-field">
                             <label>Payment Mode</label>
                             <select value={requestPaymentMode} onChange={(event) => setRequestPaymentMode(event.target.value)}>
@@ -1268,16 +1433,15 @@ function CashIn() {
                               <option value="BANK_TRANSFER">Bank Transfer</option>
                             </select>
                           </div>
-                        </div>
-
-                        <div className="form-field">
-                          <label>Bank Transfer ID / UTR</label>
-                          <input
-                            type="text"
-                            value={requestPaymentId}
-                            onChange={(event) => setRequestPaymentId(event.target.value)}
-                            placeholder="UTR / Txn ID (required for non-cash)"
-                          />
+                          <div className="form-field">
+                            <label>Bank Transfer ID / UTR</label>
+                            <input
+                              type="text"
+                              value={requestPaymentId}
+                              onChange={(event) => setRequestPaymentId(event.target.value)}
+                              placeholder="UTR / Txn ID (required for non-cash)"
+                            />
+                          </div>
                         </div>
 
                         <div className="form-field">
@@ -1439,6 +1603,159 @@ function CashIn() {
               </section>
             )}
           </div>
+
+          {isProductModalOpen && (
+            <div className="product-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="product-modal-content" style={{ backgroundColor: '#fff', borderRadius: '8px', width: '90%', maxWidth: '800px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="product-modal-header" style={{ backgroundColor: '#0052cc', color: '#fff', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                      PRODUCT CATALOG
+                    </div>
+                    <h2 style={{ margin: 0, fontSize: '18px' }}>Select products & quantity</h2>
+                    <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>Pick cylinders, refills or accessories to add to this sale</p>
+                  </div>
+                  <button 
+                    onClick={() => setIsProductModalOpen(false)} 
+                    style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >✕</button>
+                </div>
+                
+                <div className="product-modal-body" style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'center' }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" style={{ position: 'absolute', left: '12px', top: '10px' }}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                      <input 
+                        type="text" 
+                        placeholder="Search products..." 
+                        value={productCatalogSearch}
+                        onChange={(e) => setProductCatalogSearch(e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px 8px 36px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', backgroundColor: '#f5f5f5', padding: '4px', borderRadius: '6px' }}>
+                      {['All', 'Domestic', 'Commercial', 'Items'].map(tab => (
+                        <button 
+                          key={tab}
+                          onClick={() => setProductCatalogTab(tab)}
+                          style={{ 
+                            padding: '6px 12px', 
+                            borderRadius: '4px', 
+                            border: 'none', 
+                            background: productCatalogTab === tab ? '#fff' : 'transparent',
+                            boxShadow: productCatalogTab === tab ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: productCatalogTab === tab ? 600 : 400
+                          }}
+                        >{tab}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #eee', color: '#666', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '12px 8px' }}>Product</th>
+                        <th style={{ padding: '12px 8px' }}>Category</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'right' }}>Price</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'center' }}>InStock</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'center' }}>Quantity</th>
+                        <th style={{ padding: '12px 8px', textAlign: 'right' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productCatalog
+                        .filter(p => {
+                          if (productCatalogTab === 'All') return true;
+                          if (productCatalogTab === 'Domestic') return String(p.type).toUpperCase() === 'DOMESTIC';
+                          if (productCatalogTab === 'Commercial') return String(p.type).toUpperCase() === 'COMMERCIAL';
+                          if (productCatalogTab === 'Items') return String(p.type).toUpperCase() === 'ITEM' || String(p.categoryName || '').toLowerCase().includes('item');
+                          return true;
+                        })
+                        .map(product => {
+                          const tempProd = tempSelectedProducts.find(p => p.id === product.id) || { quantity: 0 };
+                          const qty = tempProd.quantity || 0;
+                          return (
+                            <tr key={product.id} style={{ borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '16px 8px', fontWeight: 500 }}>{product.name}</td>
+                              <td style={{ padding: '16px 8px' }}>
+                                <span style={{ fontSize: '10px', padding: '2px 6px', background: '#f5f5f5', borderRadius: '4px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>
+                                  {product.type || product.categoryName}
+                                </span>
+                              </td>
+                              <td style={{ padding: '16px 8px', textAlign: 'right' }}>₹{Number(product.price || 0).toLocaleString('en-IN')}</td>
+                              <td style={{ padding: '16px 8px', textAlign: 'center' }}>
+                                <span style={{ color: product.stock > 0 ? '#10b981' : '#ef4444', fontWeight: 600 }}>{product.stock || 0}</span>
+                              </td>
+                              <td style={{ padding: '16px 8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                  <button 
+                                    onClick={() => {
+                                      const newQty = Math.max(0, qty - 1);
+                                      const updated = [...tempSelectedProducts];
+                                      const idx = updated.findIndex(p => p.id === product.id);
+                                      if (idx >= 0) {
+                                        updated[idx].quantity = newQty;
+                                      } else {
+                                        updated.push({ id: product.id, name: product.name, type: product.type, price: product.price, quantity: newQty });
+                                      }
+                                      setTempSelectedProducts(updated.filter(p => p.quantity > 0));
+                                    }}
+                                    style={{ width: '28px', height: '28px', borderRadius: '4px', border: 'none', background: '#f0f0f0', cursor: 'pointer', fontWeight: 'bold' }}
+                                  >−</button>
+                                  <input 
+                                    type="number" 
+                                    value={qty}
+                                    readOnly
+                                    style={{ width: '40px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '4px', padding: '4px' }}
+                                  />
+                                  <button 
+                                    onClick={() => {
+                                      const newQty = qty + 1;
+                                      const updated = [...tempSelectedProducts];
+                                      const idx = updated.findIndex(p => p.id === product.id);
+                                      if (idx >= 0) {
+                                        updated[idx].quantity = newQty;
+                                      } else {
+                                        updated.push({ id: product.id, name: product.name, type: product.type, price: product.price, quantity: newQty });
+                                      }
+                                      setTempSelectedProducts(updated);
+                                    }}
+                                    style={{ width: '28px', height: '28px', borderRadius: '4px', border: 'none', background: '#f0f0f0', cursor: 'pointer', fontWeight: 'bold' }}
+                                  >+</button>
+                                </div>
+                              </td>
+                              <td style={{ padding: '16px 8px', textAlign: 'right' }}>
+                                {qty > 0 ? `₹${(Number(product.price || 0) * qty).toLocaleString('en-IN')}` : '—'}
+                              </td>
+                            </tr>
+                          );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="product-modal-footer" style={{ borderTop: '1px solid #eee', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: '#666' }}>Set quantity next to any product to add it to the sale</span>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button 
+                      onClick={() => setIsProductModalOpen(false)}
+                      style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontWeight: 500 }}
+                    >Cancel</button>
+                    <button 
+                      onClick={() => {
+                        setSelectedProducts(tempSelectedProducts);
+                        setIsProductModalOpen(false);
+                      }}
+                      style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#48bb78', color: '#fff', cursor: 'pointer', fontWeight: 500 }}
+                    >+ Add to sale</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>

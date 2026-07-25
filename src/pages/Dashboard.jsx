@@ -8,6 +8,7 @@ import PendingActionsCard from '../components/dashboard/PendingActionsCard';
 import DriverCollectionsCard from '../components/dashboard/DriverCollectionsCard';
 import ExpenseApprovalsCard from '../components/dashboard/ExpenseApprovalsCard';
 import NonCashReceiptsCard from '../components/dashboard/NonCashReceiptsCard';
+import CurrentBalanceModal from '../components/dashboard/CurrentBalanceModal';
 
 // Local (not UTC) YYYY-MM-DD so the default range matches the cashier's calendar day.
 function todayIso() {
@@ -23,7 +24,12 @@ function Dashboard() {
     const today = todayIso();
     return { startDate: today, endDate: today };
   });
-  const { data, loading, error } = useDashboardData(dateRange);
+  const { data, loading, error, refresh } = useDashboardData(dateRange);
+  const [isBalanceModalOpen, setBalanceModalOpen] = useState(false);
+
+  // Extract available cash from the metrics
+  const currentBalanceStr = data?.metrics?.find((m) => m.title === 'Current Balance')?.value || '₹0';
+  const availableCash = Number(currentBalanceStr.replace(/[^0-9.-]+/g, '')) || 0;
 
   return (
     <div className="app-shell">
@@ -39,20 +45,42 @@ function Dashboard() {
             <>
               <section className="summary-row">
                 {data.metrics.map((metric) => (
-                  <MetricCard key={metric.title} metric={metric} />
+                  <MetricCard
+                    key={metric.title}
+                    metric={metric}
+                    isClickable={metric.title === 'Current Balance'}
+                    onClick={() => {
+                      if (metric.title === 'Current Balance') {
+                        setBalanceModalOpen(true);
+                      }
+                    }}
+                  />
                 ))}
               </section>
 
               <section className="dashboard-main">
-                <ChartCard chart={data.chart} />
-                <PendingActionsCard actions={data.actions} />
+                <ChartCard chart={data.chart} metrics={data.metrics} />
+                {/* <PendingActionsCard actions={data.actions} /> */}
+                <ExpenseApprovalsCard 
+                  approvals={data.approvals} 
+                  onSuccess={refresh} 
+                  availableCash={availableCash} 
+                />
+
               </section>
 
               <section className="dashboard-subgrid">
                 <DriverCollectionsCard drivers={data.drivers} />
-                <ExpenseApprovalsCard approvals={data.approvals} />
                 <NonCashReceiptsCard receipts={data.receipts} />
               </section>
+
+              {isBalanceModalOpen && (
+                <CurrentBalanceModal
+                  date={dateRange.startDate}
+                  metrics={data.metrics}
+                  onClose={() => setBalanceModalOpen(false)}
+                />
+              )}
             </>
           )}
         </main>

@@ -1,8 +1,22 @@
-function ChartCard({ chart }) {
+function ChartCard({ chart, metrics }) {
   const chartWidth = 760;
   const chartHeight = 240;
   const padding = 32;
-  const maxValue = Math.max(...chart.cashIn, ...chart.cashOut);
+
+  const totalCashInStr = metrics?.find((m) => m.title === 'Total Cash In')?.value || '₹0';
+  const totalCashOutStr = metrics?.find((m) => m.title === 'Total Cash Out')?.value || '₹0';
+
+  const totalCashIn = Number(totalCashInStr.replace(/[^0-9.-]+/g, '')) || 0;
+  const totalCashOut = Number(totalCashOutStr.replace(/[^0-9.-]+/g, '')) || 0;
+
+  const dummyInSum = chart.cashIn.reduce((a, b) => a + b, 0) || 1;
+  const dummyOutSum = chart.cashOut.reduce((a, b) => a + b, 0) || 1;
+
+  const cashIn = chart.cashIn.map((v) => (v / dummyInSum) * totalCashIn);
+  const cashOut = chart.cashOut.map((v) => (v / dummyOutSum) * totalCashOut);
+
+  const maxValue = Math.max(...cashIn, ...cashOut, 1);
+
   const points = (values) =>
     values
       .map((value, index) => {
@@ -38,26 +52,26 @@ function ChartCard({ chart }) {
             </linearGradient>
           </defs>
           <polyline
-            points={points(chart.cashIn)}
+            points={points(cashIn)}
             fill="none"
             stroke="#34a853"
             strokeWidth="4"
             strokeLinecap="round"
           />
           <polyline
-            points={points(chart.cashOut)}
+            points={points(cashOut)}
             fill="none"
             stroke="#eb5757"
             strokeWidth="4"
             strokeLinecap="round"
           />
           <polygon
-            points={`${points(chart.cashIn)} ${chartWidth - padding},${chartHeight - padding} ${padding},${chartHeight - padding}`}
+            points={`${points(cashIn)} ${chartWidth - padding},${chartHeight - padding} ${padding},${chartHeight - padding}`}
             fill="url(#inflowGradient)"
             opacity="0.8"
           />
           <polygon
-            points={`${points(chart.cashOut)} ${chartWidth - padding},${chartHeight - padding} ${padding},${chartHeight - padding}`}
+            points={`${points(cashOut)} ${chartWidth - padding},${chartHeight - padding} ${padding},${chartHeight - padding}`}
             fill="url(#outflowGradient)"
             opacity="0.8"
           />
