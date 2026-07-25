@@ -104,14 +104,16 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div>
-        <div className="sidebar-title">Operations</div>
-        <div className="brand-panel">
-          <div className="brand-mark">
-            <img src={logo} alt="Cashflow logo" />
+        {/* <div className="sidebar-title">Operations</div> */}
+        <div className="">
+          <div className="">
+            {/* <img src={logo} alt="Cashflow logo" /> */}
           </div>
           <div>
-            <p className="brand-name">Cashflow</p>
-            <span className="brand-subtitle">Bharat Gas Agency</span>
+            <span className="brand-name">Suraj Gas Agency</span>
+
+            <p className="brand-name">CASHIER</p>
+            <p></p>
           </div>
         </div>
       </div>

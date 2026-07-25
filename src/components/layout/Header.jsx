@@ -32,6 +32,31 @@ function Header({ dateRange = {}, onApplyRange }) {
   const [from, setFrom] = useState(dateRange.startDate || '');
   const [to, setTo] = useState(dateRange.endDate || '');
 
+  const [userName, setUserName] = useState('Rajesh K.');
+  const [userInitials, setUserInitials] = useState('RK');
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(AUTH_USER_KEY);
+      if (stored) {
+        const user = JSON.parse(stored);
+        if (user && user.name) {
+          setUserName(user.name);
+          const initials = user.name
+            .split(' ')
+            .filter(Boolean)
+            .map((part) => part[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase();
+          setUserInitials(initials || 'U');
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     setFrom(dateRange.startDate || '');
     setTo(dateRange.endDate || '');
@@ -129,10 +154,10 @@ function Header({ dateRange = {}, onApplyRange }) {
           <span>🔔</span>
         </button>
         <div className="profile-pill">
-          <div className="avatar">RK</div>
+          <div className="avatar">{userInitials}</div>
           <div className="profile-details">
-            <span className="profile-name">Rajesh K.</span>
-            <small className="profile-role">Cashier</small>
+            <span className="profile-name">{userName}</span>
+            {/* <small className="profile-role">Cashier</small> */}
           </div>
           <button type="button" className="logout-btn" onClick={handleSignOut}>Sign out</button>
         </div>

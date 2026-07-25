@@ -10,6 +10,10 @@ export async function getCashierDashboard(range = {}) {
   return fetchJson(`${API_BASE}/cashier/dashboard${query ? `?${query}` : ''}`);
 }
 
+export async function getCashFlowEntries(date) {
+  return fetchJson(`${API_BASE}/cashier/cash-flow/entries?date=${date}`);
+}
+
 export async function getDriverCollections(page = 1, limit = 10) {
   return fetchJson(`${API_BASE}/cashier/driver-collections?page=${page}&limit=${limit}`);
 }

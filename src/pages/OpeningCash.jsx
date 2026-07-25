@@ -161,8 +161,34 @@ function OpeningCash() {
                 Start Day ⊙
               </button>
 
-              {message && <div className="success-box">{message}</div>}
-              {error && <div className="error-box">{error}</div>}
+              {lastClosingBalance !== null && (
+                <div style={{ marginTop: '24px', backgroundColor: '#fdf8ec', borderRadius: '12px', padding: '20px', border: '1px solid #f0e6d2' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{ backgroundColor: '#f3e8d2', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a5a19" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </div>
+                    <strong style={{ fontSize: '13px', color: '#8a5a19', letterSpacing: '0.5px' }}>YESTERDAY</strong>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#4b5563' }}>
+                    <span>Closing balance</span>
+                    <strong style={{ color: '#111827' }}>₹{lastClosingBalance.toLocaleString('en-IN')}</strong>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '14px', color: '#4b5563' }}>
+                    <span>Petty cash</span>
+                    <strong style={{ color: '#111827' }}>₹0</strong>
+                  </div>
+                  
+                  <div style={{ borderTop: '1px solid #f0e6d2', margin: '0 -20px', padding: '0 20px', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#111827', fontWeight: 'bold' }}>
+                    <span>Carried forward</span>
+                    <span>₹{lastClosingBalance.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              )}
+
+              {message && <div className="success-box" style={{ marginTop: '16px' }}>{message}</div>}
+              {error && <div className="error-box" style={{ marginTop: '16px' }}>{error}</div>}
 
               <div className="info-box">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>

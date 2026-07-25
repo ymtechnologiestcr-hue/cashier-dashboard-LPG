@@ -38,11 +38,22 @@ const metricIconConfig = {
   },
 };
 
-function MetricCard({ metric }) {
+function MetricCard({ metric, onClick, isClickable }) {
   const iconConfig = metricIconConfig[metric.title];
 
   return (
-    <article className={`metric-card ${metric.variant || 'neutral'}`}>
+    <article
+      className={`metric-card ${metric.variant || 'neutral'} ${isClickable ? 'clickable' : ''}`}
+      onClick={isClickable ? onClick : undefined}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
       <div className="metric-card-header">
         <div
           className="metric-icon"
@@ -58,6 +69,12 @@ function MetricCard({ metric }) {
       <p className="metric-title">{metric.title}</p>
       <p className="metric-value">{metric.value}</p>
       <p className="metric-description">{metric.description}</p>
+      {metric.paymentMethods && (
+        <div style={{ marginTop: '8px', fontSize: '0.85rem', display: 'flex', gap: '24px', opacity: 0.8 }}>
+          <span>Online: ₹{metric.paymentMethods.online.toLocaleString('en-IN')}</span>
+          <span>Bank: ₹{metric.paymentMethods.bank.toLocaleString('en-IN')}</span>
+        </div>
+      )}
     </article>
   );
 }
