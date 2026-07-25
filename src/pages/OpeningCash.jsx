@@ -9,6 +9,8 @@ function OpeningCash() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [lastClosingBalance, setLastClosingBalance] = useState(null);
+  // Petty cash the cashier set aside when the previous day was closed.
+  const [lastPettyCash, setLastPettyCash] = useState(0);
 
   const [denominations, setDenominations] = useState([
     { label: '₹500', value: 500, count: 0 },
@@ -30,6 +32,7 @@ function OpeningCash() {
         const response = await getLastClosingBalance();
         if (response?.success) {
           setLastClosingBalance(response.total_cash);
+          setLastPettyCash(Number(response.petty_cash ?? response.pettyCash ?? 0));
         }
       } catch (err) {
         console.error('Failed to fetch last closing balance:', err);
@@ -142,6 +145,10 @@ function OpeningCash() {
                   <div className="detail-item">
                     <span>Total notes</span>
                     <strong>{totalNotes}</strong>
+                  </div>
+                  <div className="detail-item">
+                    <span>Petty cash carried over</span>
+                    <strong>₹{Number(lastPettyCash || 0).toLocaleString('en-IN')}</strong>
                   </div>
                   <div className="detail-item">
                     <span>Date</span>

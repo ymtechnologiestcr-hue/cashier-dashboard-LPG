@@ -17,6 +17,9 @@ const initialDenominations = [
 function Closing() {
   const [denominations, setDenominations] = useState(initialDenominations);
   const [coinAmount, setCoinAmount] = useState(0);
+  // Cash kept aside as petty cash for the next day. Saved with the closing and
+  // read back on the Opening Cash page.
+  const [pettyCash, setPettyCash] = useState(0);
   const [differenceReason, setDifferenceReason] = useState('');
   const [systemCash, setSystemCash] = useState(0);
   const [message, setMessage] = useState('');
@@ -58,6 +61,12 @@ function Closing() {
     setCoinAmount(amount);
   };
 
+  const handlePettyCashChange = (value) => {
+    const amount = Number(value);
+    if (Number.isNaN(amount) || amount < 0) return;
+    setPettyCash(amount);
+  };
+
   const handleCloseDay = async () => {
     setMessage('');
     setError('');
@@ -79,6 +88,7 @@ function Closing() {
         { label: 'Coins', value: Number(coinAmount || 0), count: 1, subtotal: Number(coinAmount || 0) },
       ],
       differenceReason: differenceReason.trim() || null,
+      pettyCash: Number(pettyCash || 0),
     });
 
     if (response?.success) {
@@ -89,6 +99,7 @@ function Closing() {
       setSystemCash(0);
       setDenominations(initialDenominations);
       setCoinAmount(0);
+      setPettyCash(0);
       setDifferenceReason('');
       setMessage(response.message);
     } else {
@@ -135,7 +146,22 @@ function Closing() {
                   />
                   <strong>₹{Number(coinAmount || 0).toLocaleString('en-IN')}</strong>
                 </div>
+                <div className="denomination-pair">
+                  <span>Petty Cash</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={pettyCash}
+                    onChange={(event) => handlePettyCashChange(event.target.value)}
+                    placeholder="₹ total"
+                  />
+                  <strong>₹{Number(pettyCash || 0).toLocaleString('en-IN')}</strong>
+                </div>
               </div>
+              <p className="close-day-note">
+                Petty cash is recorded with the closing and shown on the next Start
+                Day. It is not part of the physical count above.
+              </p>
             </div>
 
             <div className="closing-summary-column">
