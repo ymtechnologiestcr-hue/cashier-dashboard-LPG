@@ -92,6 +92,7 @@ function CashIn() {
   const [transferVoucherStateType, setTransferVoucherStateType] = useState('INTRA_STATE');
   const [transferVoucherFromState, setTransferVoucherFromState] = useState('');
   const [transferVoucherToState, setTransferVoucherToState] = useState('');
+  const [pendingModalDriver, setPendingModalDriver] = useState(null);
 
   const loadCollections = async () => {
     setDriverLoading(true);
@@ -798,7 +799,7 @@ function CashIn() {
                         <th>UPI</th>
                         <th>TOTAL</th>
                         <th>SETTLED</th>
-                        <th>PENDING</th>
+                        <th style={{ textAlign: 'center' }}>PENDING</th>
                         <th>STATUS</th>
                         <th>ACTION</th>
                       </tr>
@@ -818,7 +819,32 @@ function CashIn() {
                           <td>₹{driver.upi.toLocaleString('en-IN')}</td>
                           <td className="total-cell">₹{driver.total.toLocaleString('en-IN')}</td>
                           <td>₹{driver.settled.toLocaleString('en-IN')}</td>
-                          <td style={{ color: 'red' }}>₹{driver.pending.toLocaleString('en-IN')}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {driver.pending > 0 ? (
+                              <div 
+                                style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  padding: '4px 12px',
+                                  borderRadius: '16px',
+                                  border: '1px solid #ffcccc',
+                                  backgroundColor: '#fff0f0',
+                                  color: '#e53e3e',
+                                  fontSize: '13px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => setPendingModalDriver(driver)}
+                              >
+                                ₹{driver.pending.toLocaleString('en-IN')}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#4a5568', fontSize: '13px', fontWeight: 500 }}>
+                                ₹0
+                              </span>
+                            )}
+                          </td>
                           <td>
                             <span className={`status-badge ${driver.status.toLowerCase()}`}>
                               {driver.status}
@@ -965,6 +991,112 @@ function CashIn() {
                           style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#f0f2f5', color: '#1a1a1a', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
                         >Close</button>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {pendingModalDriver && (
+                  <div className="driver-modal-overlay" style={{ zIndex: 1050, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="driver-modal-container" style={{ width: '90%', maxWidth: '900px', padding: 0, overflow: 'hidden', backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+                      <div style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #eee' }}>
+                        <div>
+                          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Pending amount breakdown</h2>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
+                            {pendingModalDriver.name} · Route {pendingModalDriver.route.split(' ')[0]} — unsettled amounts by sale date
+                          </p>
+                        </div>
+                        <button 
+                          onClick={() => setPendingModalDriver(null)}
+                          style={{ background: '#f0f2f5', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#1a1a1a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}
+                        >✕</button>
+                      </div>
+                      
+                      <div style={{ padding: '24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fff' }}>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Expected today</div>
+                            <div style={{ fontSize: '18px', fontWeight: 600 }}>₹{pendingModalDriver.total.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fff' }}>
+                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Settled (Cash + UPI)</div>
+                            <div style={{ fontSize: '18px', fontWeight: 600, color: '#137333' }}>₹{pendingModalDriver.settled.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div style={{ border: '1px solid #ffcccc', borderRadius: '8px', padding: '16px', backgroundColor: '#fff0f0' }}>
+                            <div style={{ fontSize: '12px', color: '#e53e3e', marginBottom: '8px' }}>Pending</div>
+                            <div style={{ fontSize: '18px', fontWeight: 600, color: '#e53e3e' }}>₹{pendingModalDriver.pending.toLocaleString('en-IN')}</div>
+                          </div>
+                        </div>
+
+                        <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: '8px' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee', color: '#666', textAlign: 'left' }}>
+                                <th style={{ padding: '12px 16px', fontWeight: 600 }}>SALE DATE</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600 }}>BILL</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600 }}>DETAILS</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>PENDING</th>
+                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>AGEING</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '12px 16px' }}>28 Jul 2026</td>
+                                <td style={{ padding: '12px 16px', color: '#666' }}>B-0912</td>
+                                <td style={{ padding: '12px 16px' }}>Domestic × 4</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#e53e3e' }}>₹0</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                  <span style={{ backgroundColor: '#fff0f0', color: '#e53e3e', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, border: '1px solid #ffcccc' }}>6d</span>
+                                </td>
+                              </tr>
+                              <tr style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '12px 16px' }}>29 Jul 2026</td>
+                                <td style={{ padding: '12px 16px', color: '#666' }}>B-0948</td>
+                                <td style={{ padding: '12px 16px' }}>Commercial × 2</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#e53e3e' }}>₹369</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                  <span style={{ backgroundColor: '#fff0f0', color: '#e53e3e', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, border: '1px solid #ffcccc' }}>5d</span>
+                                </td>
+                              </tr>
+                              <tr style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '12px 16px' }}>31 Jul 2026</td>
+                                <td style={{ padding: '12px 16px', color: '#666' }}>B-1002</td>
+                                <td style={{ padding: '12px 16px' }}>Domestic × 6 · Regulator × 1</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#e53e3e' }}>₹420</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                  <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, border: '1px solid #fde68a' }}>3d</span>
+                                </td>
+                              </tr>
+                              <tr style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '12px 16px' }}>02 Aug 2026</td>
+                                <td style={{ padding: '12px 16px', color: '#666' }}>B-1041</td>
+                                <td style={{ padding: '12px 16px' }}>Commercial × 3</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#e53e3e' }}>₹755</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                  <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, border: '1px solid #fde68a' }}>1d</span>
+                                </td>
+                              </tr>
+                              <tr style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={{ padding: '12px 16px' }}>03 Aug 2026</td>
+                                <td style={{ padding: '12px 16px', color: '#666' }}>B-1077</td>
+                                <td style={{ padding: '12px 16px' }}>Domestic × 5 · Stove × 1</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#e53e3e' }}>₹856</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                  <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, border: '1px solid #fde68a' }}>0d</span>
+                                </td>
+                              </tr>
+                            </tbody>
+                            <tfoot>
+                              <tr style={{ backgroundColor: '#fff', borderTop: '1px solid #eee' }}>
+                                <td colSpan="3" style={{ padding: '16px', fontWeight: 600, color: '#1a1a1a' }}>Total pending</td>
+                                <td style={{ padding: '16px', textAlign: 'right', fontWeight: 600, color: '#e53e3e' }}>₹{pendingModalDriver.pending.toLocaleString('en-IN')}</td>
+                                <td></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </div>
+                      
+                 
                     </div>
                   </div>
                 )}
