@@ -527,7 +527,7 @@ function CashIn() {
             .join('')
             .slice(0, 2),
           name: driver.driverName,
-          route: `${count || 0} collections`,
+          route: `${count || 0} Deliveries`,
           cylinders: `${(count || 0) * 2} cylinders`,
           cash: driver.cash,
           upi: driver.upi,
@@ -794,7 +794,7 @@ function CashIn() {
                     <thead>
                       <tr>
                         <th>DRIVER</th>
-                        <th>ROUTE</th>
+                        <th>TOTAL SALES</th>
                         <th>CASH</th>
                         <th>UPI</th>
                         <th>TOTAL</th>
@@ -1093,7 +1093,7 @@ function CashIn() {
                               </tr>
                             </tfoot>
                           </table>
-                        </div>
+                        </div>@
                       </div>
                       
                  
