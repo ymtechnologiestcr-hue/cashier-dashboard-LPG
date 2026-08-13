@@ -14,8 +14,9 @@ export async function getCashFlowEntries(date) {
   return fetchJson(`${API_BASE}/cashier/cash-flow/entries?date=${date}`);
 }
 
-export async function getDriverCollections(page = 1, limit = 10) {
-  return fetchJson(`${API_BASE}/cashier/driver-collections?page=${page}&limit=${limit}`);
+export async function getDriverCollections(page = 1, limit = 10, range = {}) {
+  const rangeQuery = buildRangeQuery(range).replace('?', '&');
+  return fetchJson(`${API_BASE}/cashier/driver-collections?page=${page}&limit=${limit}${rangeQuery}`);
 }
 
 export async function startCashierDay(payload) {
@@ -39,8 +40,8 @@ export async function recordOfficeSale(payload) {
   });
 }
 
-export async function getTodayOfficeSales() {
-  return fetchJson(`${API_BASE}/cashier/office-sales/today`);
+export async function getTodayOfficeSales(range = {}) {
+  return fetchJson(`${API_BASE}/cashier/office-sales/today${buildRangeQuery(range)}`);
 }
 
 export async function verifyDriverCollections(driverId) {
@@ -100,12 +101,12 @@ export async function uploadSupportingDocument(file) {
   return response.json();
 }
 
-export async function getTodayOfficeExpenses() {
-  return fetchJson(`${API_BASE}/cashier/office-expenses/today`);
+export async function getTodayOfficeExpenses(range = {}) {
+  return fetchJson(`${API_BASE}/cashier/office-expenses/today${buildRangeQuery(range)}`);
 }
 
-export async function getCashOutExpenseRequests() {
-  return fetchJson(`${API_BASE}/cashier/expense-requests`);
+export async function getCashOutExpenseRequests(range = {}) {
+  return fetchJson(`${API_BASE}/cashier/expense-requests${buildRangeQuery(range)}`);
 }
 
 export async function reviewCashOutExpenseRequest(expenseId, status, paymentDetails = {}) {
@@ -138,12 +139,13 @@ export async function getOtherPaymentsSummary(range = {}) {
   return fetchJson(`${API_BASE}/cashier/other-payments/summary${buildRangeQuery(range)}`);
 }
 
-export async function getTodaysCashFlow() {
-  return fetchJson(`${API_BASE}/cashier/cash-flow/today`);
+export async function getTodaysCashFlow(range = {}) {
+  return fetchJson(`${API_BASE}/cashier/cash-flow/today${buildRangeQuery(range)}`);
 }
 
-export async function getCashierPenaltyRequests(status = 'ALL') {
-  return fetchJson(`${API_BASE}/cashier/cashier-requests/pr-penalties?status=${encodeURIComponent(status)}`);
+export async function getCashierPenaltyRequests(status = 'ALL', range = {}) {
+  const rangeQuery = buildRangeQuery(range).replace('?', '&');
+  return fetchJson(`${API_BASE}/cashier/cashier-requests/pr-penalties?status=${encodeURIComponent(status)}${rangeQuery}`);
 }
 
 export async function collectCashierPenaltyRequest(requestId, payload) {
@@ -153,8 +155,9 @@ export async function collectCashierPenaltyRequest(requestId, payload) {
   });
 }
 
-export async function getCashierNameChangeRequests(status = 'ALL') {
-  return fetchJson(`${API_BASE}/cashier/cashier-requests/name-changes?status=${encodeURIComponent(status)}`);
+export async function getCashierNameChangeRequests(status = 'ALL', range = {}) {
+  const rangeQuery = buildRangeQuery(range).replace('?', '&');
+  return fetchJson(`${API_BASE}/cashier/cashier-requests/name-changes?status=${encodeURIComponent(status)}${rangeQuery}`);
 }
 
 export async function collectCashierNameChangeRequest(requestId, payload) {
@@ -164,8 +167,9 @@ export async function collectCashierNameChangeRequest(requestId, payload) {
   });
 }
 
-export async function getCashierTransferVoucherRequests(status = 'ALL') {
-  return fetchJson(`${API_BASE}/cashier/cashier-requests/transfer-vouchers?status=${encodeURIComponent(status)}`);
+export async function getCashierTransferVoucherRequests(status = 'ALL', range = {}) {
+  const rangeQuery = buildRangeQuery(range).replace('?', '&');
+  return fetchJson(`${API_BASE}/cashier/cashier-requests/transfer-vouchers?status=${encodeURIComponent(status)}${rangeQuery}`);
 }
 
 export async function collectCashierTransferVoucherRequest(requestId, payload) {
@@ -175,8 +179,9 @@ export async function collectCashierTransferVoucherRequest(requestId, payload) {
   });
 }
 
-export async function getCashierNewConnectionRequests(status = 'ALL') {
-  return fetchJson(`${API_BASE}/cashier/cashier-requests/new-connections?status=${encodeURIComponent(status)}`);
+export async function getCashierNewConnectionRequests(status = 'ALL', range = {}) {
+  const rangeQuery = buildRangeQuery(range).replace('?', '&');
+  return fetchJson(`${API_BASE}/cashier/cashier-requests/new-connections?status=${encodeURIComponent(status)}${rangeQuery}`);
 }
 
 export async function collectCashierNewConnectionRequest(requestId, payload) {

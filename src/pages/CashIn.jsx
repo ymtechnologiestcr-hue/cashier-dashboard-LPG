@@ -18,8 +18,19 @@ import {
   getCashierNewConnectionRequests,
   collectCashierNewConnectionRequest,
 } from '../services/cashierApi';
+// Local (not UTC) YYYY-MM-DD so the default range matches the cashier's calendar day.
+function todayIso() {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
 
 function CashIn() {
+  const [dateRange, setDateRange] = useState(() => {
+    const today = todayIso();
+    return { startDate: today, endDate: today };
+  });
   const [activeTab, setActiveTab] = useState('driver-collections');
   const [driverCollections, setDriverCollections] = useState([]);
   const [driverLoading, setDriverLoading] = useState(true);
@@ -97,7 +108,7 @@ function CashIn() {
   const loadCollections = async () => {
     setDriverLoading(true);
     try {
-      const response = await getDriverCollections(1, 10);
+      const response = await getDriverCollections(1, 10, dateRange);
       if (response?.success && Array.isArray(response.data)) {
         setDriverCollections(response.data);
       }
@@ -111,7 +122,7 @@ function CashIn() {
   useEffect(() => {
     async function loadOfficeSales() {
       try {
-        const response = await getTodayOfficeSales();
+        const response = await getTodayOfficeSales(dateRange);
         if (response?.success && Array.isArray(response.data)) {
           setOfficeSales(response.data);
         }
@@ -122,7 +133,7 @@ function CashIn() {
 
     loadCollections();
     loadOfficeSales();
-  }, []);
+  }, [dateRange]);
 
   const loadProductCatalog = async (query = '') => {
     try {
@@ -148,7 +159,7 @@ function CashIn() {
     setCashierPenaltyLoading(true);
     setCashierPenaltyError('');
     try {
-      const response = await getCashierPenaltyRequests('ALL');
+      const response = await getCashierPenaltyRequests('ALL', dateRange);
       if (response?.success && Array.isArray(response.data)) {
         setCashierPenaltyRequests(response.data);
       } else {
@@ -167,7 +178,7 @@ function CashIn() {
     setCashierNameChangeLoading(true);
     setCashierPenaltyError('');
     try {
-      const response = await getCashierNameChangeRequests('ALL');
+      const response = await getCashierNameChangeRequests('ALL', dateRange);
       if (response?.success && Array.isArray(response.data)) {
         setCashierNameChangeRequests(response.data);
       } else {
@@ -186,7 +197,7 @@ function CashIn() {
     setCashierTransferVoucherLoading(true);
     setCashierPenaltyError('');
     try {
-      const response = await getCashierTransferVoucherRequests('ALL');
+      const response = await getCashierTransferVoucherRequests('ALL', dateRange);
       if (response?.success && Array.isArray(response.data)) {
         setCashierTransferVoucherRequests(response.data);
       } else {
@@ -205,7 +216,7 @@ function CashIn() {
     setCashierNewConnectionLoading(true);
     setCashierPenaltyError('');
     try {
-      const response = await getCashierNewConnectionRequests('ALL');
+      const response = await getCashierNewConnectionRequests('ALL', dateRange);
       if (response?.success && Array.isArray(response.data)) {
         setCashierNewConnectionRequests(response.data);
       } else {
@@ -227,7 +238,7 @@ function CashIn() {
       loadCashierTransferVoucherRequests();
       loadCashierNewConnectionRequests();
     }
-  }, [activeTab]);
+  }, [activeTab, dateRange]);
 
   const selectedPenaltyRequest = useMemo(
     () => cashierPenaltyRequests.find((item) => Number(item.id) === Number(selectedPenaltyRequestId)) || null,
@@ -742,7 +753,7 @@ function CashIn() {
         setPartCash('');
         setNotes('');
         setSalesFile(null);
-        const saleResponse = await getTodayOfficeSales();
+        const saleResponse = await getTodayOfficeSales(dateRange);
         if (saleResponse?.success && Array.isArray(saleResponse.data)) {
           setOfficeSales(saleResponse.data);
         }
@@ -759,7 +770,7 @@ function CashIn() {
     <div className="app-shell">
       <Sidebar />
       <div className="page-content">
-        <Header />
+        <Header dateRange={dateRange} onApplyRange={setDateRange} />
         <main className="page-main">
 
           <div className="cash-in-tabs">
