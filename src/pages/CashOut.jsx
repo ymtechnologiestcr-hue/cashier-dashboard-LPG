@@ -72,7 +72,19 @@ const formatOdometerRange = (startReading, endReading) => {
   return 'Odomoter: -';
 };
 
+// Local (not UTC) YYYY-MM-DD so the default range matches the cashier's calendar day.
+function todayIso() {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
 function CashOut() {
+  const [dateRange, setDateRange] = useState(() => {
+    const today = todayIso();
+    return { startDate: today, endDate: today };
+  });
   const [selectedCategory, setSelectedCategory] = useState('Utility');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -132,7 +144,7 @@ function CashOut() {
 
   const fetchOfficeExpenses = async () => {
     try {
-      const res = await getTodayOfficeExpenses();
+      const res = await getTodayOfficeExpenses(dateRange);
       if (res.success) setTodayExpenses(res.data || []);
     } catch (err) {
       // ignore for now
@@ -141,7 +153,7 @@ function CashOut() {
 
   const fetchExpenseRequests = async () => {
     try {
-      const res = await getCashOutExpenseRequests();
+      const res = await getCashOutExpenseRequests(dateRange);
       if (res.success) {
         setExpenseRequests(res.data || []);
         setExpenseSummary(res.summary || { pendingApprovals: 0, approvedToday: 0 });
@@ -153,7 +165,7 @@ function CashOut() {
 
   const fetchAvailableCash = async () => {
     try {
-      const res = await getTodaysCashFlow();
+      const res = await getTodaysCashFlow(dateRange);
       if (res.success) {
         setAvailableCash(Number(res.currentBalance || 0));
       }
@@ -166,7 +178,7 @@ function CashOut() {
     fetchOfficeExpenses();
     fetchExpenseRequests();
     fetchAvailableCash();
-  }, []);
+  }, [dateRange]);
 
   const handleSelectCategory = (cat) => setSelectedCategory(cat);
 
@@ -308,7 +320,7 @@ function CashOut() {
     <div className="app-shell">
       <Sidebar />
       <div className="page-content">
-        <Header />
+        <Header dateRange={dateRange} onApplyRange={setDateRange} />
         <main className="page-main">
 
           <div className="cash-out-grid">

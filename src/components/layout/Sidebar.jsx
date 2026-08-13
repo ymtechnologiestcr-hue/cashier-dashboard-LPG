@@ -12,7 +12,7 @@ const navItems = [
   { label: 'Cash In', path: '/cash-in', icon: 'cashIn' },
   { label: 'Cash Out', path: '/cash-out', icon: 'cashOut' },
   { label: 'Live Position', path: '/live-position', icon: 'location' },
-  { label: 'Other Payments', path: '/other-payments', icon: 'payments' },
+  // { label: 'Other Payments', path: '/other-payments', icon: 'payments' },
   { label: 'Closing', path: '/closing', icon: 'lock' },
   { label: 'Reports', path: '/reports', icon: 'chart' },
   { label: 'Settings', path: '/settings', icon: 'settings' },
