@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
+import SplitPaymentInput, { createPaymentRow } from '../components/dashboard/SplitPaymentInput';
 import {
   getDriverCollections,
   getDriverCollectionHistory,
@@ -49,9 +50,8 @@ function CashIn() {
   const [productQuery, setProductQuery] = useState('');
   const [productResults, setProductResults] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [partCash, setPartCash] = useState('');
-  const [transactionId, setTransactionId] = useState('');
+  const [officePaymentMode, setOfficePaymentMode] = useState('SINGLE');
+  const [officePayments, setOfficePayments] = useState([createPaymentRow('CASH')]);
   const [notes, setNotes] = useState('');
   const [salesFile, setSalesFile] = useState(null);
   const [officeSaleMessage, setOfficeSaleMessage] = useState('');
@@ -67,11 +67,14 @@ function CashIn() {
   const [cashierPenaltyLoading, setCashierPenaltyLoading] = useState(false);
   const [cashierPenaltyError, setCashierPenaltyError] = useState('');
   const [selectedPenaltyRequestId, setSelectedPenaltyRequestId] = useState(null);
-  const [requestPaymentMode, setRequestPaymentMode] = useState('CASH');
-  const [requestPaymentId, setRequestPaymentId] = useState('');
+  const [requestPaymentInputMode, setRequestPaymentInputMode] = useState('SINGLE');
+  const [requestPayments, setRequestPayments] = useState([createPaymentRow('CASH')]);
   const [requestRemarks, setRequestRemarks] = useState('');
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const [activeCashierRequestType, setActiveCashierRequestType] = useState('PR Penalty');
+  
+  const [receiptPaymentMode, setReceiptPaymentMode] = useState('SINGLE');
+  const [receiptPayments, setReceiptPayments] = useState([createPaymentRow('CASH')]);
 
   const [cashierNameChangeRequests, setCashierNameChangeRequests] = useState([]);
   const [cashierNameChangeLoading, setCashierNameChangeLoading] = useState(false);
@@ -354,8 +357,8 @@ function CashIn() {
       return;
     }
 
-    setRequestPaymentMode(request.paymentMode || 'CASH');
-    setRequestPaymentId(request.paymentId || '');
+    setRequestPaymentInputMode('SINGLE');
+    setRequestPayments([{ ...createPaymentRow(request.paymentMode || 'CASH'), transactionId: request.paymentId || '' }]);
     setRequestRemarks(request.remarks || '');
     setCashierPenaltyError('');
     populateCashierCustomerFieldsFromRequest(request);
@@ -380,8 +383,8 @@ function CashIn() {
     setSelectedNameChangeRequestId(null);
     setSelectedTransferVoucherRequestId(null);
     setSelectedNewConnectionRequestId(null);
-    setRequestPaymentMode('CASH');
-    setRequestPaymentId('');
+    setRequestPaymentInputMode('SINGLE');
+    setRequestPayments([createPaymentRow('CASH')]);
     setRequestRemarks('');
     setTransferVoucherStateType('INTRA_STATE');
     setTransferVoucherFromState('');
@@ -393,8 +396,8 @@ function CashIn() {
 
   const handleResetPenaltyRequestForm = () => {
     // Always reset editable cashier fields regardless of selected request type.
-    setRequestPaymentMode('CASH');
-    setRequestPaymentId('');
+    setRequestPaymentInputMode('SINGLE');
+    setRequestPayments([createPaymentRow('CASH')]);
     setRequestRemarks('');
 
     // Reset transfer voucher specific editable fields.
@@ -469,7 +472,8 @@ function CashIn() {
       return;
     }
 
-    if (requestPaymentMode !== 'CASH' && !String(requestPaymentId || '').trim()) {
+    const nonCashPaymentWithoutId = requestPayments.find(p => p.mode !== 'CASH' && !String(p.transactionId || '').trim());
+    if (nonCashPaymentWithoutId) {
       setCashierPenaltyError('Payment ID is required for non-cash modes.');
       return;
     }
@@ -477,8 +481,11 @@ function CashIn() {
     setRequestSubmitting(true);
     try {
       const payload = {
-        paymentMode: requestPaymentMode,
-        paymentId: requestPaymentId,
+        paymentMode: requestPaymentInputMode === 'SPLIT' ? 'SPLIT' : requestPayments[0].mode,
+        paymentId: requestPaymentInputMode === 'SPLIT' 
+          ? requestPayments.filter(p => p.mode !== 'CASH').map(p => p.transactionId).join(',') 
+          : requestPayments[0].transactionId,
+        splitPayments: requestPaymentInputMode === 'SPLIT' ? requestPayments : undefined,
         remarks: requestRemarks,
       };
 
@@ -735,9 +742,12 @@ function CashIn() {
         phone: customerPhone,
         address: customerAddress,
         items,
-        payment_method: paymentMethod,
-        cash_amount: paymentMethod === 'PART_PAYMENT' ? Number(partCash || 0) : undefined,
-        transaction_id: transactionId || undefined,
+        payment_method: officePaymentMode === 'SPLIT' ? 'PART_PAYMENT' : officePayments[0].mode,
+        cash_amount: officePaymentMode === 'SPLIT' ? Number(officePayments.find(p => p.mode === 'CASH')?.amount || 0) : undefined,
+        transaction_id: officePaymentMode === 'SPLIT' 
+          ? officePayments.find(p => p.mode !== 'CASH')?.transactionId 
+          : officePayments[0].transactionId || undefined,
+        split_payments: officePaymentMode === 'SPLIT' ? officePayments : undefined,
       });
 
       if (response?.success) {
@@ -749,8 +759,8 @@ function CashIn() {
         setSelectedProducts([]);
         setProductQuery('');
         setBillNumber('');
-        setTransactionId('');
-        setPartCash('');
+        setOfficePaymentMode('SINGLE');
+        setOfficePayments([createPaymentRow('CASH')]);
         setNotes('');
         setSalesFile(null);
         const saleResponse = await getTodayOfficeSales(dateRange);
@@ -1240,53 +1250,15 @@ function CashIn() {
                         <label>Total Amount</label>
                         <input type="text" value={`₹ ${totalAmount.toLocaleString('en-IN')}`} readOnly />
                       </div>
-                      <div className="form-group">
-                        <label>Payment Mode</label>
-                        <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
-                          <option value="CASH">Cash</option>
-                          <option value="UPI">UPI</option>
-                          <option value="CARD">Card</option>
-                          <option value="PART_PAYMENT">Part Payment</option>
-                        </select>
-                      </div>
-                      {paymentMethod === 'PART_PAYMENT' ? (
-                        <>
-                          <div className="form-row">
-                            <div className="form-group">
-                              <label>Cash Amount</label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={partCash}
-                                onChange={(event) => setPartCash(event.target.value)}
-                                placeholder="Cash portion"
-                              />
-                            </div>
-                            <div className="form-group">
-                              <label>Bank Transfer ID / UTR</label>
-                              <input
-                                type="text"
-                                value={transactionId}
-                                onChange={(event) => setTransactionId(event.target.value)}
-                                placeholder="UTR / Txn ID"
-                              />
-                            </div>
-                          </div>
-                          <p className="field-note">
-                            Bank transfer amount: ₹{Math.max(totalAmount - Number(partCash || 0), 0).toLocaleString('en-IN')}
-                          </p>
-                        </>
-                      ) : (
-                        <div className="form-group">
-                          <label>Bank Transfer ID / UTR</label>
-                          <input
-                            type="text"
-                            value={transactionId}
-                            onChange={(event) => setTransactionId(event.target.value)}
-                            placeholder="UTR / Txn ID (optional)"
-                          />
-                        </div>
-                      )}
+                      
+                      <SplitPaymentInput 
+                        totalAmount={totalAmount}
+                        payments={officePayments}
+                        onChange={setOfficePayments}
+                        mode={officePaymentMode}
+                        onModeChange={setOfficePaymentMode}
+                      />
+
                       <div className="form-group">
                         <label>Notes</label>
                         <textarea
@@ -1566,28 +1538,15 @@ function CashIn() {
                           )}
                         </div>
 
-                        <div className="form-row">
-                          <div className="form-field">
-                            <label>Payment Mode</label>
-                            <select value={requestPaymentMode} onChange={(event) => setRequestPaymentMode(event.target.value)}>
-                              <option value="CASH">Cash</option>
-                              <option value="UPI">UPI</option>
-                              <option value="CARD">Card</option>
-                              <option value="BANK_TRANSFER">Bank Transfer</option>
-                            </select>
-                          </div>
-                          <div className="form-field">
-                            <label>Bank Transfer ID / UTR</label>
-                            <input
-                              type="text"
-                              value={requestPaymentId}
-                              onChange={(event) => setRequestPaymentId(event.target.value)}
-                              placeholder="UTR / Txn ID (required for non-cash)"
-                            />
-                          </div>
-                        </div>
+                        <SplitPaymentInput 
+                          totalAmount={Number(cashierFormAmount) || 0}
+                          payments={requestPayments}
+                          onChange={setRequestPayments}
+                          mode={requestPaymentInputMode}
+                          onModeChange={setRequestPaymentInputMode}
+                        />
 
-                        <div className="form-field">
+                        <div className="form-field" style={{ marginTop: '16px' }}>
                           <label>Remarks</label>
                           <textarea
                             value={requestRemarks}
@@ -1709,19 +1668,16 @@ function CashIn() {
                         <label>Description</label>
                         <input type="text" placeholder="From whom / what" />
                       </div>
-                      <div className="form-row">
-                        <div className="form-field">
-                          <label>Payment Mode</label>
-                          <select>
-                            <option>Cash</option>
-                          </select>
-                        </div>
-                        <div className="form-field">
-                          <label>Bank Transfer ID / UTR</label>
-                          <input type="text" placeholder="UTR / Txn ID (optional)" />
-                        </div>
+                      <SplitPaymentInput 
+                        totalAmount={0}
+                        payments={receiptPayments}
+                        onChange={setReceiptPayments}
+                        mode={receiptPaymentMode}
+                        onModeChange={setReceiptPaymentMode}
+                      />
+                      <div style={{ marginTop: '16px' }}>
+                        <button type="button" className="add-receipt-btn">+ Add Receipt</button>
                       </div>
-                      <button type="button" className="add-receipt-btn">+ Add Receipt</button>
                     </form>
                   </div>
 
