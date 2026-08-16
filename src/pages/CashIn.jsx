@@ -557,6 +557,7 @@ function CashIn() {
           pendingCount: driver.pendingCount,
           assignedCount: driver.assignedCount,
           settledCount: driver.settledCount,
+          iocOnlineCount: driver.iocOnlineCount || 0,
         };
       })
     : [];
@@ -818,6 +819,7 @@ function CashIn() {
                         <th>TOTAL SALES</th>
                         <th>CASH</th>
                         <th>UPI</th>
+                        <th style={{ textAlign: 'center' }}>IOC-ONLINE</th>
                         <th>TOTAL</th>
                         <th>SETTLED</th>
                         <th style={{ textAlign: 'center' }}>PENDING</th>
@@ -838,6 +840,7 @@ function CashIn() {
                           <td>{driver.route}</td>
                           <td>₹{driver.cash.toLocaleString('en-IN')}</td>
                           <td>₹{driver.upi.toLocaleString('en-IN')}</td>
+                          <td style={{ textAlign: 'center' }}>{driver.iocOnlineCount}</td>
                           <td className="total-cell">₹{driver.total.toLocaleString('en-IN')}</td>
                           <td>₹{driver.settled.toLocaleString('en-IN')}</td>
                           <td style={{ textAlign: 'center' }}>
