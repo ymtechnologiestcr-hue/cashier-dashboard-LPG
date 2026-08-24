@@ -551,7 +551,10 @@ function CashIn() {
           upi: driver.upi,
           total: driver.total,
           settled: driver.settled || 0,
+          // pendingTotal = total unsettled with driver (ASSIGNED + PENDING = total - settled)
           pending: driver.pendingTotal || 0,
+          // requested = submitted by driver to cashier, awaiting approval (PENDING only)
+          requested: driver.requested || 0,
           status: driver.status,
           driverId: driver.driver_id,
           pendingCount: driver.pendingCount,
@@ -822,6 +825,7 @@ function CashIn() {
                         <th style={{ textAlign: 'center' }}>IOC-ONLINE</th>
                         <th>TOTAL</th>
                         <th>SETTLED</th>
+                        <th style={{ textAlign: 'center' }}>REQUESTED</th>
                         <th style={{ textAlign: 'center' }}>PENDING</th>
                         <th>STATUS</th>
                         <th>ACTION</th>
@@ -843,6 +847,30 @@ function CashIn() {
                           <td style={{ textAlign: 'center' }}>{driver.iocOnlineCount}</td>
                           <td className="total-cell">₹{driver.total.toLocaleString('en-IN')}</td>
                           <td>₹{driver.settled.toLocaleString('en-IN')}</td>
+                          {/* REQUESTED: submitted by driver, awaiting cashier approval */}
+                          <td style={{ textAlign: 'center' }}>
+                            {driver.requested > 0 ? (
+                              <div
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '4px 12px',
+                                  borderRadius: '16px',
+                                  border: '1px solid #f6ad55',
+                                  backgroundColor: '#fffaf0',
+                                  color: '#c05621',
+                                  fontSize: '13px',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                ₹{driver.requested.toLocaleString('en-IN')}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#4a5568', fontSize: '13px', fontWeight: 500 }}>₹0</span>
+                            )}
+                          </td>
+                          {/* PENDING: total unsettled with driver = total - settled */}
                           <td style={{ textAlign: 'center' }}>
                             {driver.pending > 0 ? (
                               <div 
