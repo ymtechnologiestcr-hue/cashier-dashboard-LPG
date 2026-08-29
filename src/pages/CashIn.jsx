@@ -18,6 +18,8 @@ import {
   collectCashierTransferVoucherRequest,
   getCashierNewConnectionRequests,
   collectCashierNewConnectionRequest,
+  createCashierReceipt,
+  getRecentCashierReceipts,
 } from '../services/cashierApi';
 // Local (not UTC) YYYY-MM-DD so the default range matches the cashier's calendar day.
 function todayIso() {
@@ -75,6 +77,12 @@ function CashIn() {
   
   const [receiptPaymentMode, setReceiptPaymentMode] = useState('SINGLE');
   const [receiptPayments, setReceiptPayments] = useState([createPaymentRow('CASH')]);
+  const [receiptType, setReceiptType] = useState('ADVANCE');
+  const [receiptAmount, setReceiptAmount] = useState('');
+  const [receiptDescription, setReceiptDescription] = useState('');
+  const [recentReceipts, setRecentReceipts] = useState([]);
+  const [recentReceiptsLoading, setRecentReceiptsLoading] = useState(false);
+  const [receiptSubmitting, setReceiptSubmitting] = useState(false);
 
   const [cashierNameChangeRequests, setCashierNameChangeRequests] = useState([]);
   const [cashierNameChangeLoading, setCashierNameChangeLoading] = useState(false);
@@ -133,10 +141,38 @@ function CashIn() {
         console.error('Unable to load today office sales:', error);
       }
     }
+    async function loadRecentReceipts() {
+      setRecentReceiptsLoading(true);
+      try {
+        const response = await getRecentCashierReceipts(dateRange);
+        if (response?.success && Array.isArray(response.data)) {
+          setRecentReceipts(response.data);
+        }
+      } catch (error) {
+        console.error('Unable to load recent receipts:', error);
+      } finally {
+        setRecentReceiptsLoading(false);
+      }
+    }
 
     loadCollections();
     loadOfficeSales();
+    loadRecentReceipts();
   }, [dateRange]);
+
+  const loadRecentReceiptsExternal = async () => {
+    setRecentReceiptsLoading(true);
+    try {
+      const response = await getRecentCashierReceipts(dateRange);
+      if (response?.success && Array.isArray(response.data)) {
+        setRecentReceipts(response.data);
+      }
+    } catch (error) {
+      console.error('Unable to load recent receipts:', error);
+    } finally {
+      setRecentReceiptsLoading(false);
+    }
+  };
 
   const loadProductCatalog = async (query = '') => {
     try {
@@ -713,6 +749,40 @@ function CashIn() {
     );
   }, [selectedProducts]);
 
+  const handleAddReceipt = async (e) => {
+    e.preventDefault();
+    if (!receiptAmount || isNaN(receiptAmount) || receiptAmount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    setReceiptSubmitting(true);
+    try {
+      const payload = {
+        type: receiptType,
+        amount: Number(receiptAmount),
+        description: receiptDescription,
+        paymentMode: receiptPaymentMode === 'SPLIT' ? 'SPLIT' : receiptPayments[0].mode,
+        transferId: receiptPaymentMode === 'SPLIT' 
+          ? receiptPayments.filter(p => p.mode !== 'CASH').map(p => p.transactionId).join(',') 
+          : receiptPayments[0].transactionId || null,
+        payments: receiptPaymentMode === 'SPLIT' ? receiptPayments : null,
+      };
+      const res = await createCashierReceipt(payload);
+      if (res?.success) {
+        setReceiptAmount('');
+        setReceiptDescription('');
+        setReceiptType('ADVANCE');
+        setReceiptPaymentMode('SINGLE');
+        setReceiptPayments([createPaymentRow('CASH')]);
+        loadRecentReceiptsExternal();
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to add receipt');
+    } finally {
+      setReceiptSubmitting(false);
+    }
+  };
+
   const handleSubmitOfficeSale = async () => {
     setOfficeSaleError('');
     setOfficeSaleMessage('');
@@ -838,7 +908,7 @@ function CashIn() {
                             <div className="driver-avatar">{driver.initials}</div>
                             <div>
                               <strong>{driver.name}</strong>
-                              <div className="driver-meta">{driver.cylinders}</div>
+                              {/* <div className="driver-meta">{driver.cylinders}</div> */}
                             </div>
                           </td>
                           <td>{driver.route}</td>
@@ -1682,32 +1752,34 @@ function CashIn() {
                   <div className="add-receipt-form">
                     <h2>Add Receipt</h2>
                     <p>Advances, due collections, miscellaneous</p>
-                    <form>
+                    <form onSubmit={handleAddReceipt}>
                       <div className="form-group">
                         <label>Type</label>
                         <div className="type-buttons">
-                          <button type="button" className="type-btn">Advance</button>
-                          <button type="button" className="type-btn active">Due Collection</button>
-                          <button type="button" className="type-btn">Other</button>
+                          <button type="button" className={`type-btn ${receiptType === 'ADVANCE' ? 'active' : ''}`} onClick={() => setReceiptType('ADVANCE')}>Advance</button>
+                          <button type="button" className={`type-btn ${receiptType === 'DUE_COLLECTION' ? 'active' : ''}`} onClick={() => setReceiptType('DUE_COLLECTION')}>Due Collection</button>
+                          <button type="button" className={`type-btn ${receiptType === 'OTHER' ? 'active' : ''}`} onClick={() => setReceiptType('OTHER')}>Other</button>
                         </div>
                       </div>
                       <div className="form-field">
                         <label>Amount</label>
-                        <input type="text" placeholder="₹ 0" />
+                        <input type="number" placeholder="₹ 0" value={receiptAmount} onChange={(e) => setReceiptAmount(e.target.value)} required />
                       </div>
                       <div className="form-field">
                         <label>Description</label>
-                        <input type="text" placeholder="From whom / what" />
+                        <input type="text" placeholder="From whom / what" value={receiptDescription} onChange={(e) => setReceiptDescription(e.target.value)} required />
                       </div>
                       <SplitPaymentInput 
-                        totalAmount={0}
+                        totalAmount={Number(receiptAmount) || 0}
                         payments={receiptPayments}
                         onChange={setReceiptPayments}
                         mode={receiptPaymentMode}
                         onModeChange={setReceiptPaymentMode}
                       />
                       <div style={{ marginTop: '16px' }}>
-                        <button type="button" className="add-receipt-btn">+ Add Receipt</button>
+                        <button type="submit" className="add-receipt-btn" disabled={receiptSubmitting}>
+                          {receiptSubmitting ? 'Submitting...' : '+ Add Receipt'}
+                        </button>
                       </div>
                     </form>
                   </div>
@@ -1716,17 +1788,22 @@ function CashIn() {
                     <h2>Recent Receipts</h2>
                     <p className="section-date">Today</p>
                     <div className="receipt-list">
-                      {[
-                        { category: 'DUE COLLECTION', name: 'Mehta Hotel - pending dues', amount: 8400 },
-                        { category: 'ADVANCE', name: 'Krishna Caterers - cylinder advance', amount: 5000 },
-                        { category: 'OTHER', name: 'Empty cylinder return refund', amount: 1200 },
-                      ].map((receipt, index) => (
-                        <div key={index} className="receipt-item">
-                          <div className="receipt-category">{receipt.category}</div>
-                          <strong>{receipt.name}</strong>
-                          <span className="receipt-amount">{receipt.amount}</span>
-                        </div>
-                      ))}
+                      {recentReceiptsLoading ? (
+                        <p>Loading...</p>
+                      ) : recentReceipts.length === 0 ? (
+                        <p>No recent receipts.</p>
+                      ) : (
+                        recentReceipts.map((receipt) => (
+                          <div key={receipt.id} className="receipt-item">
+                            <div className="receipt-category">{receipt.typeLabel}</div>
+                            <strong>{receipt.description}</strong>
+                            <span className="receipt-amount">₹{Number(receipt.amount).toLocaleString('en-IN')}</span>
+                            <div style={{ fontSize: '12px', opacity: 0.7, marginTop: '4px' }}>
+                              {receipt.paymentModeLabel}
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>

@@ -88,8 +88,13 @@ export async function uploadSupportingDocument(file) {
   const formData = new FormData();
   formData.append('file', file);
 
+  const token = localStorage.getItem("cashier_auth_token");
+
   const response = await fetch(`${API_BASE}/upload/supporting-document`, {
     method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   });
 
@@ -121,6 +126,17 @@ export async function recordOtherPayment(payload) {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function createCashierReceipt(payload) {
+  return fetchJson(`${API_BASE}/cashier/receipts`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getRecentCashierReceipts(range = {}) {
+  return fetchJson(`${API_BASE}/cashier/receipts/recent${buildRangeQuery(range)}`);
 }
 
 function buildRangeQuery(range = {}) {
