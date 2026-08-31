@@ -6,13 +6,15 @@ import { getTodaysCashFlow } from '../services/cashierApi';
 function LivePosition() {
   const [cashFlow, setCashFlow] = useState({ openingBalance: 0, inflow: { total: 0, count: 0 }, outflow: { total: 0, count: 0 }, cashInflow: 0, cashOutflow: 0, currentBalance: 0 });
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState({});
 
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
 
     async function fetchData() {
       try {
-        const res = await getTodaysCashFlow();
+        const res = await getTodaysCashFlow(dateRange);
         if (isMounted && res.success) {
           setCashFlow(res);
         }
@@ -35,7 +37,7 @@ function LivePosition() {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, []);
+  }, [dateRange]);
 
   const { openingBalance, inflow, outflow, currentBalance } = cashFlow;
   const cashInflow = cashFlow.cashInflow ?? inflow.total;
@@ -56,19 +58,18 @@ function LivePosition() {
     .map((value, index) => `${(index / (outflowPoints.length - 1)) * 100}% ${(100 - (value / maxValue) * 100)}%`)
     .join(',');
 
-  if (loading) {
-    return <div className="loading-shell">Loading...</div>;
-  }
-
   return (
     <div className="app-shell">
       <Sidebar />
       <div className="page-content">
-        <Header />
+        <Header dateRange={dateRange} onApplyRange={setDateRange} />
         <main className="page-main">
-
-          <section className="live-hero-card">
-            <div className="live-hero-top">
+          {loading ? (
+            <div className="loading-shell" style={{ minHeight: '400px' }}>Loading live position...</div>
+          ) : (
+            <>
+              <section className="live-hero-card">
+                <div className="live-hero-top">
               <span className="live-badge">LIVE · UPDATING EVERY SECOND</span>
               <span className="live-status">Healthy Range</span>
             </div>
@@ -168,15 +169,17 @@ function LivePosition() {
                 <h3>₹{outflow.total.toLocaleString('en-IN')}</h3>
                 <p className="info-meta">{outflow.count} expenses approved</p>
               </div>
-              <div className="alert-card">
+              {/* <div className="alert-card">
                 <span className="alert-icon">⚠️</span>
                 <div>
                   <p className="alert-title">Large transaction at 2:48 PM</p>
                   <p>₹48,000 from Hotel Greenview — verify before close.</p>
                 </div>
-              </div>
+              </div> */}
             </div>
           </section>
+          </>
+          )}
         </main>
       </div>
     </div>
