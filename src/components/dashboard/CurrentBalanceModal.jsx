@@ -34,6 +34,9 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
   const cashInEntries = entries.filter((e) => e.direction === 'IN');
   const cashOutEntries = entries.filter((e) => e.direction === 'OUT');
 
+  const totalInAmount = cashInEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const totalOutAmount = cashOutEntries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
   // Find summary metrics
   const openingStr = metrics.find((m) => m.title === 'Opening Balance')?.value || '₹0';
   const cashInStr = metrics.find((m) => m.title === 'Total Cash In')?.value || '₹0';
@@ -89,6 +92,11 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
                 >
                   {metric.value}
                 </span>
+                {metric.paymentMethods && (
+                  <span style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '2px' }}>
+                    Online: ₹{Number(metric.paymentMethods.online || 0).toLocaleString('en-IN')}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -110,7 +118,7 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
                     Cash In
                     <span className="cb-count">- {cashInEntries.length} entries</span>
                   </div>
-                  <span>{cashInStr}</span>
+                  <span>₹{totalInAmount.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="cb-table-wrapper">
                   <table className="cb-table">
@@ -161,7 +169,7 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
                     Cash Out
                     <span className="cb-count">- {cashOutEntries.length} entries</span>
                   </div>
-                  <span>{cashOutStr}</span>
+                  <span>₹{totalOutAmount.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="cb-table-wrapper">
                   <table className="cb-table">
