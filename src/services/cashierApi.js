@@ -143,6 +143,7 @@ function buildRangeQuery(range = {}) {
   const params = new URLSearchParams();
   if (range?.startDate) params.append('startDate', range.startDate);
   if (range?.endDate) params.append('endDate', range.endDate);
+  if (range?.date) params.append('date', range.date);
   const query = params.toString();
   return query ? `?${query}` : '';
 }
