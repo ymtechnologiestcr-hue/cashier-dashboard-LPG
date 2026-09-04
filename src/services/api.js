@@ -43,6 +43,14 @@ export async function fetchJson(url, options = {}) {
       error.status = response.status;
       error.data = data;
 
+      if (response.status === 401) {
+        localStorage.removeItem("cashier_auth_token");
+        localStorage.removeItem("cashier_auth_user");
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
+
       // Globally show the error using sonner toast
       toast.error(message);
 
