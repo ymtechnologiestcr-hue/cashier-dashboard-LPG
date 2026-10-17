@@ -41,6 +41,7 @@ function CashIn() {
   const [collectionHistory, setCollectionHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [driverModalTab, setDriverModalTab] = useState('cash');
   const [officeSales, setOfficeSales] = useState([]);
   const [billNumber, setBillNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -618,12 +619,13 @@ function CashIn() {
 
   const handleViewDriverHistory = async (driver) => {
     setSelectedDriverDetails(driver);
+    setDriverModalTab('cash');
     setHistoryError('');
     setHistoryLoading(true);
     setCollectionHistory(null);
 
     try {
-      const response = await getDriverCollectionHistory(driver.driverId, 1, 100);
+      const response = await getDriverCollectionHistory(driver.driverId, 1, 100, dateRange);
       if (response?.success && response.data) {
         setCollectionHistory(response.data);
       } else {
@@ -1021,96 +1023,343 @@ function CashIn() {
                         >✕</button>
                       </div>
                       
-                      <div style={{ padding: '24px', backgroundColor: '#fff' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '32px' }}>
-                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
-                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Cash</div>
-                            <div style={{ fontSize: '18px', fontWeight: 600 }}>₹{selectedDriverDetails.cash.toLocaleString('en-IN')}</div>
+                      <div style={{ padding: '24px', maxHeight: 'calc(85vh - 140px)', overflowY: 'auto' }}>
+                        {/* Summary Metrics */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                          <div style={{ border: '1px solid #c6f6d5', borderRadius: '8px', padding: '16px', backgroundColor: '#f0fff4' }}>
+                            <div style={{ fontSize: '12px', color: '#22543d', fontWeight: 600, marginBottom: '6px' }}>💵 Cash Collections</div>
+                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#22543d' }}>₹{selectedDriverDetails.cash.toLocaleString('en-IN')}</div>
                           </div>
-                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
-                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>UPI</div>
-                            <div style={{ fontSize: '18px', fontWeight: 600 }}>₹{selectedDriverDetails.upi.toLocaleString('en-IN')}</div>
+                          <div style={{ border: '1px solid #bee3f8', borderRadius: '8px', padding: '16px', backgroundColor: '#ebf8ff' }}>
+                            <div style={{ fontSize: '12px', color: '#2b6cb0', fontWeight: 600, marginBottom: '6px' }}>🌐 Online / UPI</div>
+                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#2b6cb0' }}>₹{selectedDriverDetails.upi.toLocaleString('en-IN')}</div>
                           </div>
-                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
-                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Total</div>
-                            <div style={{ fontSize: '18px', fontWeight: 600 }}>₹{selectedDriverDetails.total.toLocaleString('en-IN')}</div>
+                          <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
+                            <div style={{ fontSize: '12px', color: '#4a5568', fontWeight: 600, marginBottom: '6px' }}>Total Delivered</div>
+                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#1a202c' }}>₹{selectedDriverDetails.total.toLocaleString('en-IN')}</div>
                           </div>
-                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa' }}>
-                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Pending</div>
-                            <div style={{ fontSize: '18px', fontWeight: 600, color: '#e53e3e' }}>₹{selectedDriverDetails.pending.toLocaleString('en-IN')}</div>
+                          <div style={{ border: '1px solid #fed7d7', borderRadius: '8px', padding: '16px', backgroundColor: '#fff5f5' }}>
+                            <div style={{ fontSize: '12px', color: '#9b2c2c', fontWeight: 600, marginBottom: '6px' }}>Pending Settlement</div>
+                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#e53e3e' }}>₹{selectedDriverDetails.pending.toLocaleString('en-IN')}</div>
                           </div>
-                          <div style={{ border: '1px solid #eee', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                            <div style={{ fontSize: '12px', color: '#666' }}>Status</div>
+                          <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div style={{ fontSize: '12px', color: '#4a5568', fontWeight: 600 }}>Settlement Status</div>
                             <div><span className={`status-badge ${selectedDriverDetails.status.toLowerCase()}`}>{selectedDriverDetails.status}</span></div>
                           </div>
                         </div>
 
-                        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>Sales Breakdown</h3>
-                        <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: '8px' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                            <thead>
-                              <tr style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee', color: '#666', textAlign: 'left' }}>
-                                <th style={{ padding: '12px 16px', fontWeight: 600 }}>BILL #</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 600 }}>CUSTOMER</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>DOM</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>COM</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>ITEMS</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>AMOUNT</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'center' }}>MODE</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {historyLoading ? (
-                                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#666' }}>Loading...</td></tr>
-                              ) : (!collectionHistory?.items || collectionHistory.items.length === 0 || !collectionHistory.items[0].transactions || collectionHistory.items[0].transactions.length === 0) ? (
-                                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#666' }}>No transactions found</td></tr>
-                              ) : (
-                                collectionHistory.items[0].transactions.map((tx, idx) => (
-                                  <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                                    <td style={{ padding: '12px 16px', color: '#0052cc', fontWeight: 500 }}>B-{tx.saleId}</td>
-                                    <td style={{ padding: '12px 16px' }}>{tx.customerName}</td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tx.domQty || 0}</td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tx.comQty || 0}</td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tx.itemsQty || 0}</td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, fontSize: '15px' }}>₹{tx.amount.toLocaleString('en-IN')}</td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                      <span style={{ 
-                                        padding: '2px 8px', 
-                                        borderRadius: '4px', 
-                                        fontSize: '11px', 
-                                        fontWeight: 600,
-                                        backgroundColor: tx.paymentMode === 'CASH' ? '#d4edda' : '#e2e3e5',
-                                        color: tx.paymentMode === 'CASH' ? '#155724' : '#383d41'
-                                      }}>
-                                        {tx.paymentMode === 'CASH' ? 'Cash' : tx.paymentMode}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))
-                              )}
-                            </tbody>
-                            {(collectionHistory?.items && collectionHistory.items.length > 0 && collectionHistory.items[0].transactions && collectionHistory.items[0].transactions.length > 0) && (
-                              <tfoot>
-                                <tr style={{ backgroundColor: '#f9f9f9', borderTop: '1px solid #eee', fontWeight: 600 }}>
-                                  <td colSpan="2" style={{ padding: '12px 16px' }}>Total</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.domQty || 0), 0)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.comQty || 0), 0)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.itemsQty || 0), 0)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '15px' }}>
-                                    ₹{collectionHistory.items[0].transactions.reduce((acc, tx) => acc + (tx.amount || 0), 0).toLocaleString('en-IN')}
-                                  </td>
-                                  <td></td>
+                        {/* SECTION 1: Item-Wise Sales Breakdown (For Manual Verification) */}
+                        <div style={{ marginBottom: '28px', backgroundColor: '#f8fafc', padding: '18px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <div>
+                              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                📋 Item-Wise Sales Breakdown
+                              </h3>
+                              <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
+                                Verify collections by manual calculation (Quantity × Rate = Total Amount)
+                              </p>
+                            </div>
+                            <span style={{ fontSize: '12px', background: '#e0f2fe', color: '#0369a1', padding: '4px 10px', borderRadius: '12px', fontWeight: 600 }}>
+                              Rate Verification
+                            </span>
+                          </div>
+
+                          <div style={{ overflowX: 'auto', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#334155', textAlign: 'left' }}>
+                                  <th style={{ padding: '10px 16px', fontWeight: 700 }}>ITEM / PRODUCT NAME</th>
+                                  <th style={{ padding: '10px 16px', fontWeight: 700, textAlign: 'center' }}>QUANTITY</th>
+                                  <th style={{ padding: '10px 16px', fontWeight: 700, textAlign: 'right' }}>RATE (₹)</th>
+                                  <th style={{ padding: '10px 16px', fontWeight: 700, textAlign: 'right' }}>TOTAL AMOUNT (₹)</th>
                                 </tr>
-                              </tfoot>
-                            )}
-                          </table>
+                              </thead>
+                              <tbody>
+                                {historyLoading ? (
+                                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Loading item breakdown...</td></tr>
+                                ) : (() => {
+                                  const currentItem = collectionHistory?.items?.[0];
+                                  const breakdown = currentItem?.itemWiseBreakdown || [];
+
+                                  if (!breakdown.length) {
+                                    // Fallback: aggregate from transactions if available
+                                    const allTxs = currentItem?.transactions || [];
+                                    const fallbackItems = [];
+                                    const domSum = allTxs.reduce((s, t) => s + (t.domQty || 0), 0);
+                                    const comSum = allTxs.reduce((s, t) => s + (t.comQty || 0), 0);
+                                    if (domSum > 0) fallbackItems.push({ itemName: '14.2kg Domestic Cylinder', quantity: domSum, rate: 0, totalAmount: 0 });
+                                    if (comSum > 0) fallbackItems.push({ itemName: '19kg Commercial Cylinder', quantity: comSum, rate: 0, totalAmount: 0 });
+
+                                    if (!fallbackItems.length) {
+                                      return <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>No item-wise data available for this delivery</td></tr>;
+                                    }
+
+                                    return fallbackItems.map((it, idx) => (
+                                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                        <td style={{ padding: '10px 16px', fontWeight: 600, color: '#1e293b' }}>{it.itemName}</td>
+                                        <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 600 }}>{it.quantity}</td>
+                                        <td style={{ padding: '10px 16px', textAlign: 'right', color: '#64748b' }}>—</td>
+                                        <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600 }}>—</td>
+                                      </tr>
+                                    ));
+                                  }
+
+                                  return breakdown.map((it, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                      <td style={{ padding: '10px 16px', fontWeight: 600, color: '#1e293b' }}>
+                                        {it.itemName}
+                                        {it.productType && (
+                                          <span style={{ marginLeft: '8px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: it.productType === 'COMMERCIAL' ? '#fef3c7' : '#dbeafe', color: it.productType === 'COMMERCIAL' ? '#92400e' : '#1e40af' }}>
+                                            {it.productType}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                                        {it.quantity}
+                                      </td>
+                                      <td style={{ padding: '10px 16px', textAlign: 'right', color: '#334155', fontWeight: 600 }}>
+                                        {it.rate > 0 ? `₹${Number(it.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                                      </td>
+                                      <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>
+                                        ₹{Number(it.totalAmount || (it.quantity * it.rate)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  ));
+                                })()}
+                              </tbody>
+                              {(() => {
+                                const currentItem = collectionHistory?.items?.[0];
+                                const breakdown = currentItem?.itemWiseBreakdown || [];
+                                if (!breakdown.length) return null;
+                                const totalQty = breakdown.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+                                const totalSum = breakdown.reduce((sum, it) => sum + Number(it.totalAmount || (it.quantity * it.rate)), 0);
+
+                                return (
+                                  <tfoot>
+                                    <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 700, color: '#0f172a' }}>
+                                      <td style={{ padding: '12px 16px' }}>Total Item Breakdown</td>
+                                      <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '15px' }}>{totalQty}</td>
+                                      <td style={{ padding: '12px 16px', textAlign: 'right', color: '#64748b' }}>—</td>
+                                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '16px', color: '#0052cc' }}>
+                                        ₹{totalSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  </tfoot>
+                                );
+                              })()}
+                            </table>
+                          </div>
                         </div>
+
+                        {/* SECTION 2: Consumer-Wise Details (Separate Cash Collections & Online Sales) */}
+                        {(() => {
+                          const currentItem = collectionHistory?.items?.[0];
+                          const allTxs = currentItem?.transactions || [];
+                          const cashTxs = currentItem?.cashTransactions || allTxs.filter((t) => !t.isOnline && t.paymentMode === 'CASH');
+                          const onlineTxs = currentItem?.onlineTransactions || allTxs.filter((t) => t.isOnline || ['UPI', 'ONLINE', 'CARD'].includes(t.paymentMode));
+
+                          const cashTotal = cashTxs.reduce((s, t) => s + (t.amount || 0), 0);
+                          const onlineTotal = onlineTxs.reduce((s, t) => s + (t.amount || 0), 0);
+
+                          const displayTxs = driverModalTab === 'cash' ? cashTxs : driverModalTab === 'online' ? onlineTxs : allTxs;
+
+                          return (
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                                <div>
+                                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                                    Consumer-Wise Delivery Transactions
+                                  </h3>
+                                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
+                                    Cash and online sales are displayed separately to avoid mixing collections
+                                  </p>
+                                </div>
+
+                                {/* Section Switch Tabs */}
+                                <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDriverModalTab('cash')}
+                                    style={{
+                                      padding: '6px 14px',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      background: driverModalTab === 'cash' ? '#16a34a' : 'transparent',
+                                      color: driverModalTab === 'cash' ? '#fff' : '#475569',
+                                      boxShadow: driverModalTab === 'cash' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                  >
+                                    💵 Cash Collections ({cashTxs.length}) · ₹{cashTotal.toLocaleString('en-IN')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDriverModalTab('online')}
+                                    style={{
+                                      padding: '6px 14px',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      background: driverModalTab === 'online' ? '#0284c7' : 'transparent',
+                                      color: driverModalTab === 'online' ? '#fff' : '#475569',
+                                      boxShadow: driverModalTab === 'online' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                  >
+                                    🌐 Online Sales ({onlineTxs.length}) · ₹{onlineTotal.toLocaleString('en-IN')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDriverModalTab('all')}
+                                    style={{
+                                      padding: '6px 14px',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      background: driverModalTab === 'all' ? '#475569' : 'transparent',
+                                      color: driverModalTab === 'all' ? '#fff' : '#475569',
+                                      boxShadow: driverModalTab === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                  >
+                                    All ({allTxs.length})
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Informational banner based on active tab */}
+                              {driverModalTab === 'cash' ? (
+                                <div style={{ marginBottom: '12px', padding: '8px 14px', borderRadius: '6px', background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '12px', color: '#15803d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span>💵</span>
+                                  <span>Showing <strong>Cash collections only</strong>. Physical cash expected from driver: <strong>₹{cashTotal.toLocaleString('en-IN')}</strong>.</span>
+                                </div>
+                              ) : driverModalTab === 'online' ? (
+                                <div style={{ marginBottom: '12px', padding: '8px 14px', borderRadius: '6px', background: '#f0f9ff', border: '1px solid #bae6fd', fontSize: '12px', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span>🌐</span>
+                                  <span>Showing <strong>Online sales only</strong>. Processed digitally via UPI/Payment Gateway — do NOT collect as cash from driver. Total: <strong>₹{onlineTotal.toLocaleString('en-IN')}</strong>.</span>
+                                </div>
+                              ) : null}
+
+                              <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                  <thead>
+                                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                                      <th style={{ padding: '12px 14px', fontWeight: 600 }}>BILL #</th>
+                                      <th style={{ padding: '12px 14px', fontWeight: 600 }}>CONSUMER DETAILS</th>
+                                      <th style={{ padding: '12px 14px', fontWeight: 600 }}>ITEMS (QTY × RATE)</th>
+                                      <th style={{ padding: '12px 14px', fontWeight: 600, textAlign: 'center' }}>QTY</th>
+                                      <th style={{ padding: '12px 14px', fontWeight: 600, textAlign: 'right' }}>AMOUNT</th>
+                                      <th style={{ padding: '12px 14px', fontWeight: 600, textAlign: 'center' }}>MODE</th>
+                                      <th style={{ padding: '12px 14px', fontWeight: 600, textAlign: 'center' }}>STATUS</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {historyLoading ? (
+                                      <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>Loading transactions...</td></tr>
+                                    ) : displayTxs.length === 0 ? (
+                                      <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
+                                          {driverModalTab === 'cash' ? 'No cash transactions for this driver.' : driverModalTab === 'online' ? 'No online transactions for this driver.' : 'No transactions found.'}
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      displayTxs.map((tx, idx) => (
+                                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                          <td style={{ padding: '12px 14px', color: '#0052cc', fontWeight: 600 }}>
+                                            B-{tx.saleId}
+                                          </td>
+                                          <td style={{ padding: '12px 14px' }}>
+                                            <div style={{ fontWeight: 600, color: '#1e293b' }}>{tx.customerName}</div>
+                                            {tx.consumerNumber && (
+                                              <div style={{ fontSize: '11px', color: '#64748b' }}>No: {tx.consumerNumber}</div>
+                                            )}
+                                            {tx.customerPhone && (
+                                              <div style={{ fontSize: '11px', color: '#64748b' }}>📞 {tx.customerPhone}</div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '12px 14px' }}>
+                                            {tx.items && tx.items.length > 0 ? (
+                                              tx.items.map((it, itemIdx) => (
+                                                <div key={itemIdx} style={{ fontSize: '12px', color: '#334155', marginBottom: '2px' }}>
+                                                  <span style={{ fontWeight: 600 }}>{it.productName}</span>: {it.quantity} × ₹{it.rate}
+                                                </div>
+                                              ))
+                                            ) : (
+                                              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                                {tx.domQty > 0 ? `14.2kg Domestic: ${tx.domQty}` : ''}
+                                                {tx.comQty > 0 ? ` · 19kg Commercial: ${tx.comQty}` : ''}
+                                                {!tx.domQty && !tx.comQty ? `Items: ${tx.itemsQty || 1}` : ''}
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600 }}>
+                                            {(tx.items && tx.items.length > 0)
+                                              ? tx.items.reduce((s, it) => s + (it.quantity || 0), 0)
+                                              : (tx.domQty || 0) + (tx.comQty || 0) + (tx.itemsQty || 0)}
+                                          </td>
+                                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                                            ₹{tx.amount.toLocaleString('en-IN')}
+                                          </td>
+                                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <span style={{
+                                              padding: '3px 8px',
+                                              borderRadius: '4px',
+                                              fontSize: '11px',
+                                              fontWeight: 600,
+                                              backgroundColor: tx.paymentMode === 'CASH' ? '#dcfce7' : '#e0f2fe',
+                                              color: tx.paymentMode === 'CASH' ? '#15803d' : '#0369a1',
+                                            }}>
+                                              {tx.paymentMode === 'CASH' ? 'Cash' : tx.paymentMode}
+                                            </span>
+                                          </td>
+                                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <span className={`status-badge ${(tx.status || 'pending').toLowerCase()}`}>
+                                              {tx.status || 'Pending'}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))
+                                    )}
+                                  </tbody>
+                                  {displayTxs.length > 0 && (
+                                    <tfoot>
+                                      <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 700 }}>
+                                        <td colSpan="3" style={{ padding: '12px 14px' }}>
+                                          Total for {driverModalTab === 'cash' ? 'Cash Collections' : driverModalTab === 'online' ? 'Online Sales' : 'All Sales'} ({displayTxs.length} orders)
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                          {displayTxs.reduce((sum, tx) => {
+                                            if (tx.items && tx.items.length > 0) {
+                                              return sum + tx.items.reduce((s, it) => s + (it.quantity || 0), 0);
+                                            }
+                                            return sum + (tx.domQty || 0) + (tx.comQty || 0) + (tx.itemsQty || 0);
+                                          }, 0)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '15px', color: driverModalTab === 'cash' ? '#16a34a' : '#0284c7' }}>
+                                          ₹{displayTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toLocaleString('en-IN')}
+                                        </td>
+                                        <td colSpan="2"></td>
+                                      </tr>
+                                    </tfoot>
+                                  )}
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
-                      
-                      <div style={{ borderTop: '1px solid #eee', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#fff' }}>
+
+                      <div style={{ borderTop: '1px solid #e2e8f0', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc' }}>
                         <button 
                           onClick={() => setSelectedDriverDetails(null)}
-                          style={{ padding: '10px 24px', borderRadius: '6px', border: 'none', background: '#f0f2f5', color: '#1a1a1a', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}
+                          style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', color: '#1e293b', cursor: 'pointer', fontWeight: 600, fontSize: '14px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                         >Close</button>
                       </div>
                     </div>

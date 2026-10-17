@@ -41,7 +41,9 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
   const openingStr = metrics.find((m) => m.title === 'Opening Balance')?.value || '₹0';
   const cashInStr = metrics.find((m) => m.title === 'Total Cash In')?.value || '₹0';
   const cashOutStr = metrics.find((m) => m.title === 'Total Cash Out')?.value || '₹0';
-  const currentStr = metrics.find((m) => m.title === 'Current Balance')?.value || '₹0';
+  const currentMetric = metrics.find((m) => m.title === 'Current Balance' || m.title === 'Date Range Net Balance');
+  const currentStr = currentMetric?.value || '₹0';
+  const balanceTitle = currentMetric?.title || 'Current Balance';
 
   const formatTime = (isoString) => {
     if (!isoString) return '';
@@ -58,8 +60,8 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
       <div className="cb-modal-content">
         <div className="cb-modal-header">
           <div>
-            <h2>Current Balance · Line Items</h2>
-            <p>All cash in and cash out transactions for today</p>
+            <h2>{balanceTitle} · Line Items</h2>
+            <p>All cash in and cash out transactions for {date || 'selected period'}</p>
           </div>
           <div className="cb-header-actions">
             <button className="btn-export">
@@ -83,7 +85,7 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
                 <span className="cb-summary-label">{metric.title.toUpperCase()}</span>
                 <span
                   className={`cb-summary-value ${
-                    metric.title.includes('Cash In') || metric.title.includes('Current Balance')
+                    metric.title.includes('Cash In') || metric.title.includes('Balance')
                       ? 'success'
                       : metric.title.includes('Cash Out')
                       ? 'danger'
@@ -144,8 +146,19 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
                           <tr key={idx}>
                             <td className="col-time">{formatTime(entry.timestamp)}</td>
                             <td className="col-ref">{entry.reference_id}</td>
-                            <td className="col-source">{entry.source || 'Unknown'}</td>
-                            <td className="col-type">{entry.description || entry.type}</td>
+                            <td className="col-source">
+                              <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                                {entry.source || entry.payee || 'Customer'}
+                              </span>
+                            </td>
+                            <td className="col-type">
+                              <span style={{ fontWeight: 600, color: '#0052cc' }}>
+                                {entry.expense_name || entry.type_label || entry.type}
+                              </span>
+                              {entry.description && entry.description !== (entry.expense_name || entry.type) && (
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>{entry.description}</div>
+                              )}
+                            </td>
                             <td className="col-mode">
                               <span className={`mode-pill ${getModeClass(entry.payment_mode)}`}>{entry.payment_mode}</span>
                             </td>
@@ -195,8 +208,23 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
                           <tr key={idx}>
                             <td className="col-time">{formatTime(entry.timestamp)}</td>
                             <td className="col-ref">{entry.reference_id}</td>
-                            <td className="col-source">{entry.payee || 'Unknown'}</td>
-                            <td className="col-type">{entry.description || entry.type}</td>
+                            <td className="col-source">
+                              <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                                {entry.payee || entry.source || 'N/A'}
+                              </span>
+                            </td>
+                            <td className="col-type">
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontWeight: 600, color: '#b91c1c' }}>
+                                  {entry.expense_name || entry.category || entry.type_label || entry.type}
+                                </span>
+                                {entry.description && entry.description !== (entry.expense_name || entry.category) && (
+                                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                    {entry.description}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="col-mode">
                               <span className={`mode-pill ${getModeClass(entry.payment_mode)}`}>{entry.payment_mode}</span>
                             </td>
@@ -217,7 +245,7 @@ function CurrentBalanceModal({ date, metrics, onClose }) {
             Opening {openingStr} + Cash In {cashInStr} - Cash Out {cashOutStr}
           </div>
           <div className="cb-final-balance">
-            Current Balance <span>{currentStr}</span>
+            {balanceTitle} <span>{currentStr}</span>
           </div>
         </div>
       </div>

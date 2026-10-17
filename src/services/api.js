@@ -18,14 +18,25 @@ export async function fetchJson(url, options = {}) {
     // Read token from localStorage
     const token = localStorage.getItem("cashier_auth_token");
 
-    const response = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-        // Inject token if it exists
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      ...options,
-    });
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          "Content-Type": "application/json",
+          // Inject token if it exists
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        ...options,
+      });
+    } catch (networkErr) {
+      const isConnRefused =
+        networkErr.message === 'Failed to fetch' || networkErr.name === 'TypeError';
+      const friendlyMsg = isConnRefused
+        ? `Cannot connect to backend server. Make sure the server is running on port 5001.`
+        : networkErr.message || 'Network request failed';
+      toast.error(friendlyMsg);
+      throw new Error(friendlyMsg);
+    }
 
     if (!response.ok) {
       const raw = await response.text();
@@ -42,6 +53,14 @@ export async function fetchJson(url, options = {}) {
       const error = new Error(message);
       error.status = response.status;
       error.data = data;
+
+      if (response.status === 401) {
+        localStorage.removeItem("cashier_auth_token");
+        localStorage.removeItem("cashier_auth_user");
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
 
       // Globally show the error using sonner toast
       toast.error(message);
