@@ -50,8 +50,9 @@ export async function verifyDriverCollections(driverId) {
   });
 }
 
-export async function getDriverCollectionHistory(driverId, page = 1, limit = 5) {
-  return fetchJson(`${API_BASE}/drivers/${driverId}/collection-history?page=${page}&limit=${limit}`);
+export async function getDriverCollectionHistory(driverId, page = 1, limit = 5, range = {}) {
+  const rangeQuery = buildRangeQuery(range).replace('?', '&');
+  return fetchJson(`${API_BASE}/drivers/${driverId}/collection-history?page=${page}&limit=${limit}${rangeQuery}`);
 }
 
 export async function getLastClosingBalance() {

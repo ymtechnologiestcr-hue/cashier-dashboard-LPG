@@ -27,9 +27,10 @@ function Dashboard() {
   const { data, loading, error, refresh } = useDashboardData(dateRange);
   const [isBalanceModalOpen, setBalanceModalOpen] = useState(false);
 
-  // Extract available cash from the metrics
-  const currentBalanceStr = data?.metrics?.find((m) => m.title === 'Current Balance')?.value || '₹0';
-  const availableCash = Number(currentBalanceStr.replace(/[^0-9.-]+/g, '')) || 0;
+  // Extract available cash: prefer explicit live drawer cash from backend, falling back to Current Balance metric
+  const availableCash = typeof data?.availableCash === 'number'
+    ? data.availableCash
+    : Number(data?.metrics?.find((m) => m.title === 'Current Balance')?.value?.replace(/[^0-9.-]+/g, '')) || 0;
 
   return (
     <div className="app-shell">
@@ -40,7 +41,27 @@ function Dashboard() {
           {loading ? (
             <div className="loading-shell">Loading dashboard…</div>
           ) : error ? (
-            <div className="error-shell">{error}</div>
+            <div className="error-shell">
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={refresh}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    backgroundColor: '#1d4ed8',
+                    color: '#ffffff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
           ) : (
             <>
               <section className="summary-row">
@@ -48,9 +69,9 @@ function Dashboard() {
                   <MetricCard
                     key={metric.title}
                     metric={metric}
-                    isClickable={metric.title === 'Current Balance'}
+                    isClickable={metric.title === 'Current Balance' || metric.title === 'Date Range Net Balance'}
                     onClick={() => {
-                      if (metric.title === 'Current Balance') {
+                      if (metric.title === 'Current Balance' || metric.title === 'Date Range Net Balance') {
                         setBalanceModalOpen(true);
                       }
                     }}

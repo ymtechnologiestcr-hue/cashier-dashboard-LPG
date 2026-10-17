@@ -104,6 +104,17 @@ function CashOut() {
   const [paymentError, setPaymentError] = useState('');
   const [reviewingId, setReviewingId] = useState(null);
 
+  // High-resolution lightbox zoom viewer state
+  const [zoomingImage, setZoomingImage] = useState(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [rotateDeg, setRotateDeg] = useState(0);
+
+  const handleOpenZoom = (image) => {
+    setZoomingImage(image);
+    setZoomScale(1);
+    setRotateDeg(0);
+  };
+
   const statsCards = useMemo(
     () => [
       {
@@ -510,8 +521,24 @@ function CashOut() {
                   <div className="cashout-modal-grid">
                     {expenseImages.map((item) => (
                       <div key={item.label} className="cashout-photo-card">
-                        <p>{item.label}</p>
-                        <img src={item.url} alt={item.label} className="cashout-photo" />
+                        <div className="cashout-photo-header">
+                          <p>{item.label}</p>
+                          <button
+                            type="button"
+                            className="cashout-zoom-btn"
+                            onClick={() => handleOpenZoom(item)}
+                          >
+                            🔍 Zoom & Inspect
+                          </button>
+                        </div>
+                        <div
+                          className="cashout-photo-wrapper"
+                          onClick={() => handleOpenZoom(item)}
+                          title="Click to view full image and zoom"
+                        >
+                          <img src={item.url} alt={item.label} className="cashout-photo" />
+                          <div className="cashout-photo-hover-hint">🔍 Click to zoom</div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -526,8 +553,24 @@ function CashOut() {
                   <div className="cashout-modal-grid">
                     {odometerImages.map((item) => (
                       <div key={item.label} className="cashout-photo-card">
-                        <p>{item.label}</p>
-                        <img src={item.url} alt={item.label} className="cashout-photo" />
+                        <div className="cashout-photo-header">
+                          <p>{item.label}</p>
+                          <button
+                            type="button"
+                            className="cashout-zoom-btn"
+                            onClick={() => handleOpenZoom(item)}
+                          >
+                            🔍 Zoom & Inspect
+                          </button>
+                        </div>
+                        <div
+                          className="cashout-photo-wrapper"
+                          onClick={() => handleOpenZoom(item)}
+                          title="Click to view full image and zoom"
+                        >
+                          <img src={item.url} alt={item.label} className="cashout-photo" />
+                          <div className="cashout-photo-hover-hint">🔍 Click to zoom</div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -616,6 +659,89 @@ function CashOut() {
               >
                 {reviewingId === payingExpense.id ? 'Processing...' : `Pay ${formatCurrency(payingExpense.amount)}`}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {zoomingImage ? (
+        <div className="cashout-image-viewer-backdrop" onClick={() => setZoomingImage(null)}>
+          <div className="cashout-image-viewer-content" onClick={(event) => event.stopPropagation()}>
+            <div className="cashout-image-viewer-header">
+              <div className="cashout-image-viewer-title">
+                <h3>{zoomingImage.label}</h3>
+                <p>{selectedExpense?.createdByName ? `Submitted by ${selectedExpense.createdByName} · ${formatCurrency(selectedExpense.amount)}` : ''}</p>
+              </div>
+              <div className="cashout-image-viewer-controls">
+                <button
+                  type="button"
+                  className="viewer-ctrl-btn"
+                  onClick={() => setZoomScale((prev) => Math.max(0.5, Number((prev - 0.25).toFixed(2))))}
+                  title="Zoom Out"
+                >
+                  −
+                </button>
+                <span className="viewer-zoom-label">{Math.round(zoomScale * 100)}%</span>
+                <button
+                  type="button"
+                  className="viewer-ctrl-btn"
+                  onClick={() => setZoomScale((prev) => Math.min(4, Number((prev + 0.25).toFixed(2))))}
+                  title="Zoom In"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="viewer-ctrl-btn"
+                  onClick={() => {
+                    setZoomScale(1);
+                    setRotateDeg(0);
+                  }}
+                  title="Reset Zoom"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="viewer-ctrl-btn"
+                  onClick={() => setRotateDeg((prev) => (prev + 90) % 360)}
+                  title="Rotate 90° Clockwise"
+                >
+                  ↻ Rotate
+                </button>
+                <a
+                  href={zoomingImage.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="viewer-ctrl-btn"
+                  title="Open original image in new tab"
+                >
+                  ↗ Open Tab
+                </a>
+                <button
+                  type="button"
+                  className="viewer-close-btn"
+                  onClick={() => setZoomingImage(null)}
+                  title="Close viewer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="cashout-image-viewer-stage">
+              <div
+                className="cashout-image-viewer-canvas"
+                style={{
+                  transform: `scale(${zoomScale}) rotate(${rotateDeg}deg)`,
+                  transition: 'transform 0.15s ease-out',
+                }}
+              >
+                <img
+                  src={zoomingImage.url}
+                  alt={zoomingImage.label}
+                  className="cashout-image-viewer-img"
+                />
+              </div>
             </div>
           </div>
         </div>

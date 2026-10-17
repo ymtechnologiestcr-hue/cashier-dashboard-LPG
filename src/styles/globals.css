@@ -2929,21 +2929,82 @@ body {
   border-radius: 18px;
   background: #f8fafc;
   padding: 14px;
+  display: flex;
+  flex-direction: column;
 }
 
-.cashout-photo-card p {
-  margin: 0 0 12px;
+.cashout-photo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cashout-photo-header p {
+  margin: 0;
   color: #475569;
   font-size: 13px;
   font-weight: 700;
 }
 
-.cashout-photo {
+.cashout-zoom-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #0052cc;
+  background: #eef4ff;
+  color: #0052cc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cashout-zoom-btn:hover {
+  background: #0052cc;
+  color: #fff;
+}
+
+.cashout-photo-wrapper {
+  position: relative;
   width: 100%;
-  height: 220px;
-  object-fit: cover;
+  height: 240px;
   border-radius: 14px;
-  background: #e2e8f0;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cashout-photo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+  transition: transform 0.2s ease;
+}
+
+.cashout-photo-wrapper:hover .cashout-photo {
+  transform: scale(1.03);
+}
+
+.cashout-photo-hover-hint {
+  position: absolute;
+  bottom: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.cashout-photo-wrapper:hover .cashout-photo-hover-hint {
+  opacity: 1;
 }
 
 .cashout-photo-empty {
@@ -2955,6 +3016,140 @@ body {
   color: #94a3b8;
   font-size: 13px;
   font-weight: 700;
+}
+
+/* Lightbox modal for zooming & inspection */
+.cashout-image-viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.cashout-image-viewer-content {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  width: 95%;
+  max-width: 1000px;
+  height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.cashout-image-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+.cashout-image-viewer-title h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cashout-image-viewer-title p {
+  margin: 2px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.cashout-image-viewer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewer-ctrl-btn {
+  background: #334155;
+  color: #f8fafc;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.viewer-ctrl-btn:hover {
+  background: #475569;
+  color: #fff;
+}
+
+.viewer-zoom-label {
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 44px;
+  text-align: center;
+}
+
+.viewer-close-btn {
+  background: #e11d48;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 8px;
+  transition: background 0.15s ease;
+}
+
+.viewer-close-btn:hover {
+  background: #be123c;
+}
+
+.cashout-image-viewer-stage {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #020617;
+  padding: 24px;
+  cursor: grab;
+}
+
+.cashout-image-viewer-stage:active {
+  cursor: grabbing;
+}
+
+.cashout-image-viewer-canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+}
+
+.cashout-image-viewer-img {
+  max-width: 80vw;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
 }
 
 .cashout-modal-footer {
