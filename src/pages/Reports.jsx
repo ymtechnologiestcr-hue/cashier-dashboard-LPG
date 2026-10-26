@@ -1,74 +1,89 @@
+import { useSearchParams } from 'react-router-dom';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
+import DailySalesReport from '../components/reports/DailySalesReport';
+import TotalCollectionReport from '../components/reports/TotalCollectionReport';
+import ExpensesReport from '../components/reports/ExpensesReport';
+import ConsolidatedCashReport from '../components/reports/ConsolidatedCashReport';
+import ClosingCashReport from '../components/reports/ClosingCashReport';
 
-const reports = [
-  { title: 'Daily Cash Report', subtitle: 'Full day summary with opening, in/out, closing', icon: '📄' },
-  { title: 'Expense Report', subtitle: 'All approved and pending expenses by category', icon: '⬆️' },
-  { title: 'Collection Report', subtitle: 'Driver-wise and route-wise collections', icon: '⬇️' },
+const reportModules = [
+  {
+    id: 'sales',
+    name: 'Daily Sales Report',
+    icon: '📊',
+    desc: 'Domestic (5%) & Commercial (18%) GST reports with Excel/PDF export',
+  },
+  {
+    id: 'collections',
+    name: 'Total Collection Report',
+    icon: '💰',
+    desc: 'Cash, UPI, Online, Office Sales, Customer Service & Other Receipts',
+  },
+  {
+    id: 'expenses',
+    name: 'Expenses Report',
+    icon: '📑',
+    desc: 'Driver Expense Requests & Office Expense Entries with status audits',
+  },
+  {
+    id: 'consolidated',
+    name: 'Consolidated Cash Report',
+    icon: '⚖️',
+    desc: 'Reconcile Opening, Cash In, Cash Out, and Closing Balance',
+  },
+  {
+    id: 'closing',
+    name: 'Closing Cash with Denomination',
+    icon: '💵',
+    desc: 'Physical currency denomination count, reconciliation & closing history',
+  },
 ];
 
-function Reports() {
+export default function Reports() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'sales';
+
+  const handleTabChange = (tabId) => {
+    setSearchParams({ tab: tabId });
+  };
+
   return (
     <div className="app-shell">
       <Sidebar />
       <div className="page-content">
         <Header />
-        <main className="page-main">
-
-          <section className="report-cards-row">
-            {reports.map((report) => (
-              <article key={report.title} className="report-card">
-                <div className="report-icon">{report.icon}</div>
-                <div>
-                  <h2>{report.title}</h2>
-                  <p>{report.subtitle}</p>
-                </div>
-                <div className="report-actions">
-                  <button className="report-action-button">PDF</button>
-                  <button className="report-action-button">Excel</button>
-                </div>
-              </article>
-            ))}
+        <main className="page-main reports-main">
+          {/* Top Level Module Switcher Tabs */}
+          <section className="reports-nav-section">
+            <div className="reports-nav-tabs">
+              {reportModules.map((mod) => (
+                <button
+                  key={mod.id}
+                  type="button"
+                  className={`reports-nav-tab-btn ${currentTab === mod.id ? 'active' : ''}`}
+                  onClick={() => handleTabChange(mod.id)}
+                >
+                  <span className="tab-icon">{mod.icon}</span>
+                  <div className="tab-text-box">
+                    <span className="tab-name">{mod.name}</span>
+                    <span className="tab-desc-preview">{mod.desc}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </section>
 
-          <section className="report-filters-card">
-            <div className="card-heading">
-              <div>
-                <p className="section-label">Filters</p>
-                <h2>Refine your report data</h2>
-              </div>
-            </div>
-            <div className="report-filters-grid">
-              <div className="form-field">
-                <label>From Date</label>
-                <input type="text" value="01 Apr 2025" readOnly />
-              </div>
-              <div className="form-field">
-                <label>To Date</label>
-                <input type="text" value="18 Apr 2025" readOnly />
-              </div>
-              <div className="form-field">
-                <label>Driver</label>
-                <select>
-                  <option>All drivers</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Category</label>
-                <select>
-                  <option>All categories</option>
-                </select>
-              </div>
-            </div>
-            <div className="filter-actions">
-              <button className="secondary-button">Reset</button>
-              <button className="primary-button">Apply Filters</button>
-            </div>
+          {/* Active Report Module View */}
+          <section className="report-content-card">
+            {currentTab === 'sales' && <DailySalesReport />}
+            {currentTab === 'collections' && <TotalCollectionReport />}
+            {currentTab === 'expenses' && <ExpensesReport />}
+            {currentTab === 'consolidated' && <ConsolidatedCashReport />}
+            {currentTab === 'closing' && <ClosingCashReport />}
           </section>
         </main>
       </div>
     </div>
   );
 }
-
-export default Reports;

@@ -59,11 +59,28 @@
   gap: 8px;
   padding: 8px 16px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   background: #f8fafc;
   color: #334155;
   font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-export:hover:not(:disabled) {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.btn-export:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-export:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .btn-close {
@@ -73,10 +90,17 @@
   border: none;
   background: #f1f5f9;
   color: #334155;
-  font-size: 18px;
+  font-size: 20px;
+  line-height: 1;
   display: grid;
   place-items: center;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 /* Summary Row */
