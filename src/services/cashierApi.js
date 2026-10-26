@@ -208,3 +208,50 @@ export async function collectCashierNewConnectionRequest(requestId, payload) {
     body: JSON.stringify(payload),
   });
 }
+
+// Cashier Reports API
+export async function getDailySalesReport(params = {}) {
+  const query = buildReportQuery(params);
+  return fetchJson(`${API_BASE}/cashier/reports/daily-sales${query}`);
+}
+
+export async function getTotalCollectionReport(params = {}) {
+  const query = buildReportQuery(params);
+  return fetchJson(`${API_BASE}/cashier/reports/total-collection${query}`);
+}
+
+export async function getExpensesReport(params = {}) {
+  const query = buildReportQuery(params);
+  return fetchJson(`${API_BASE}/cashier/reports/expenses${query}`);
+}
+
+export async function getConsolidatedCashReport(params = {}) {
+  const query = buildReportQuery(params);
+  return fetchJson(`${API_BASE}/cashier/reports/consolidated-cash${query}`);
+}
+
+export async function getClosingCashReport(params = {}) {
+  const query = buildReportQuery(params);
+  return fetchJson(`${API_BASE}/cashier/reports/closing-cash${query}`);
+}
+
+export async function submitClosingCashReport(payload) {
+  return fetchJson(`${API_BASE}/cashier/reports/closing-cash`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+function buildReportQuery(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.timeframe) searchParams.append('timeframe', params.timeframe);
+  if (params.startDate) searchParams.append('startDate', params.startDate);
+  if (params.endDate) searchParams.append('endDate', params.endDate);
+  if (params.date) searchParams.append('date', params.date);
+  if (params.driverId && params.driverId !== 'ALL') searchParams.append('driverId', params.driverId);
+  if (params.productId && params.productId !== 'ALL') searchParams.append('productId', params.productId);
+  if (params.category && params.category !== 'ALL') searchParams.append('category', params.category);
+  if (params.status && params.status !== 'ALL') searchParams.append('status', params.status);
+  const q = searchParams.toString();
+  return q ? `?${q}` : '';
+}
