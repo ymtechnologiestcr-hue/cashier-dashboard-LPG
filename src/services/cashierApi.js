@@ -242,6 +242,26 @@ export async function submitClosingCashReport(payload) {
   });
 }
 
+export async function getCashierCreditSales(range = {}, status = 'ALL', search = '') {
+  const query = buildRangeQuery(range);
+  const sep = query ? '&' : '?';
+  const statusParam = status && status !== 'ALL' ? `${sep}status=${status}` : '';
+  const searchSep = (query || statusParam) ? '&' : '?';
+  const searchParam = search ? `${searchSep}search=${encodeURIComponent(search)}` : '';
+  return fetchJson(`${API_BASE}/cashier/credit-sales${query}${statusParam}${searchParam}`);
+}
+
+export async function settleCashierCreditSale(saleId, payload) {
+  return fetchJson(`${API_BASE}/cashier/credit-sales/${saleId}/settle`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getCashierCreditSalePaymentHistory(saleId) {
+  return fetchJson(`${API_BASE}/cashier/credit-sales/${saleId}/history`);
+}
+
 function buildReportQuery(params = {}) {
   const searchParams = new URLSearchParams();
   if (params.timeframe) searchParams.append('timeframe', params.timeframe);
