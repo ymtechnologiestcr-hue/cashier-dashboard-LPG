@@ -20,6 +20,9 @@ import {
   collectCashierNewConnectionRequest,
   createCashierReceipt,
   getRecentCashierReceipts,
+  getCashierCreditSales,
+  settleCashierCreditSale,
+  getCashierCreditSalePaymentHistory,
 } from '../services/cashierApi';
 // Local (not UTC) YYYY-MM-DD so the default range matches the cashier's calendar day.
 function todayIso() {
@@ -116,6 +119,39 @@ function CashIn() {
   const [transferVoucherFromState, setTransferVoucherFromState] = useState('');
   const [transferVoucherToState, setTransferVoucherToState] = useState('');
   const [pendingModalDriver, setPendingModalDriver] = useState(null);
+
+  // Credit Sales states
+  const [creditSales, setCreditSales] = useState([]);
+  const [creditSummary, setCreditSummary] = useState({
+    totalCreditSales: 0,
+    totalSettled: 0,
+    totalPending: 0,
+    pendingCount: 0,
+    settledCount: 0,
+    totalCount: 0,
+  });
+  const [creditLoading, setCreditLoading] = useState(false);
+  const [creditError, setCreditError] = useState('');
+  const [creditStatusFilter, setCreditStatusFilter] = useState('ALL');
+  const [creditSearchQuery, setCreditSearchQuery] = useState('');
+  const [creditDateFilterActive, setCreditDateFilterActive] = useState(false);
+
+  // Credit Settle Modal states
+  const [selectedCreditSale, setSelectedCreditSale] = useState(null);
+  const [isCreditSettleModalOpen, setIsCreditSettleModalOpen] = useState(false);
+  const [creditSettleAmount, setCreditSettleAmount] = useState('');
+  const [creditSettlePaymentMethod, setCreditSettlePaymentMethod] = useState('CASH');
+  const [creditSettleDate, setCreditSettleDate] = useState(() => todayIso());
+  const [creditSettleNotes, setCreditSettleNotes] = useState('');
+  const [creditSettleSubmitting, setCreditSettleSubmitting] = useState(false);
+  const [creditSettleError, setCreditSettleError] = useState('');
+  const [creditSettleSuccess, setCreditSettleSuccess] = useState('');
+
+  // Credit Payment History Modal states
+  const [isCreditHistoryModalOpen, setIsCreditHistoryModalOpen] = useState(false);
+  const [creditPaymentHistory, setCreditPaymentHistory] = useState([]);
+  const [creditHistoryLoading, setCreditHistoryLoading] = useState(false);
+  const [creditHistoryError, setCreditHistoryError] = useState('');
 
   const loadCollections = async () => {
     setDriverLoading(true);
@@ -279,6 +315,112 @@ function CashIn() {
       loadCashierNewConnectionRequests();
     }
   }, [activeTab, dateRange]);
+
+  const loadCreditSales = async () => {
+    setCreditLoading(true);
+    setCreditError('');
+    try {
+      const range = creditDateFilterActive ? dateRange : {};
+      const response = await getCashierCreditSales(range, creditStatusFilter, creditSearchQuery);
+      if (response?.success) {
+        setCreditSales(response.data || []);
+        if (response.summary) setCreditSummary(response.summary);
+      } else {
+        setCreditSales([]);
+      }
+    } catch (error) {
+      console.error('Unable to load cashier credit sales:', error);
+      setCreditError('Failed to load credit sales.');
+      setCreditSales([]);
+    } finally {
+      setCreditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'credit-sales') {
+      loadCreditSales();
+    }
+  }, [activeTab, creditStatusFilter, creditDateFilterActive, dateRange]);
+
+  const handleCreditSearch = (e) => {
+    if (e) e.preventDefault();
+    loadCreditSales();
+  };
+
+  const handleOpenCreditSettle = (sale) => {
+    setSelectedCreditSale(sale);
+    setCreditSettleAmount(String(sale.pendingAmount || ''));
+    setCreditSettlePaymentMethod('CASH');
+    setCreditSettleDate(todayIso());
+    setCreditSettleNotes('');
+    setCreditSettleError('');
+    setCreditSettleSuccess('');
+    setIsCreditSettleModalOpen(true);
+  };
+
+  const handleConfirmCreditSettle = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedCreditSale) return;
+    const num = Number(creditSettleAmount);
+    if (!num || num <= 0) {
+      setCreditSettleError('Please enter a valid settlement amount');
+      return;
+    }
+    if (num > Number(selectedCreditSale.pendingAmount)) {
+      setCreditSettleError(`Amount cannot exceed pending balance of ₹${Number(selectedCreditSale.pendingAmount).toLocaleString('en-IN')}`);
+      return;
+    }
+
+    try {
+      setCreditSettleSubmitting(true);
+      setCreditSettleError('');
+      const response = await settleCashierCreditSale(selectedCreditSale.saleId, {
+        amount: num,
+        paymentMethod: creditSettlePaymentMethod,
+        paymentDate: creditSettleDate,
+        notes: creditSettleNotes,
+      });
+
+      if (response?.success) {
+        setCreditSettleSuccess('Settlement recorded successfully!');
+        setTimeout(() => {
+          setIsCreditSettleModalOpen(false);
+          setCreditSettleSuccess('');
+          loadCreditSales();
+          loadRecentReceiptsExternal();
+        }, 600);
+      } else {
+        setCreditSettleError(response?.message || 'Failed to settle credit sale');
+      }
+    } catch (err) {
+      console.error('Settlement error:', err);
+      setCreditSettleError(err.message || 'Settlement failed. Please try again.');
+    } finally {
+      setCreditSettleSubmitting(false);
+    }
+  };
+
+  const handleOpenCreditHistory = async (sale) => {
+    setSelectedCreditSale(sale);
+    setIsCreditHistoryModalOpen(true);
+    setCreditHistoryLoading(true);
+    setCreditHistoryError('');
+    try {
+      const response = await getCashierCreditSalePaymentHistory(sale.saleId);
+      if (response?.success) {
+        setCreditPaymentHistory(response.data || []);
+      } else {
+        setCreditPaymentHistory([]);
+      }
+    } catch (err) {
+      console.error('History load error:', err);
+      setCreditHistoryError('Failed to load payment history');
+      setCreditPaymentHistory([]);
+    } finally {
+      setCreditHistoryLoading(false);
+    }
+  };
 
   const selectedPenaltyRequest = useMemo(
     () => cashierPenaltyRequests.find((item) => Number(item.id) === Number(selectedPenaltyRequestId)) || null,
@@ -866,6 +1008,7 @@ function CashIn() {
                 { id: 'office-sales', label: 'Office Sales' },
                 { id: 'cashier-requests', label: 'Customer Service ' },
                 { id: 'other-receipts', label: 'Other Receipts' },
+                { id: 'credit-sales', label: 'Credit Sales' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -2058,6 +2201,463 @@ function CashIn() {
                 </div>
               </section>
             )}
+
+            {activeTab === 'credit-sales' && (
+              <section className="tab-content credit-sales-tab">
+                <div className="tab-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: '#111827' }}>
+                      Credit Sales · {creditSummary.totalCount || creditSales.length}
+                    </h2>
+                    <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                      Customer credit sales recorded from driver deliveries. Settle outstanding balances via Cash or UPI.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setCreditDateFilterActive(!creditDateFilterActive)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: creditDateFilterActive ? '#eff6ff' : '#ffffff',
+                        color: creditDateFilterActive ? '#1d4ed8' : '#374151',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                      title="Toggle between All Dates and Selected Date Range"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      {creditDateFilterActive
+                        ? `Filtered: ${dateRange.startDate} to ${dateRange.endDate}`
+                        : 'Showing: All Time (Click to filter by date)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={loadCreditSales}
+                      disabled={creditLoading}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: '#ffffff',
+                        color: '#374151',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 Summary Stat Cards */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: '16px',
+                    marginBottom: '24px',
+                  }}
+                >
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '16px',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                      Total Credit Sales
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>
+                      ₹{Number(creditSummary.totalCreditSales || 0).toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      {creditSummary.totalCount || 0} total invoice(s)
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '12px',
+                      padding: '16px',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>
+                      Settled by Cashier
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
+                      ₹{Number(creditSummary.totalSettled || 0).toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '4px' }}>
+                      {creditSummary.settledCount || 0} fully cleared
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      borderRadius: '12px',
+                      padding: '16px',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>
+                      Outstanding Pending
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: 800, color: '#dc2626', marginTop: '6px' }}>
+                      ₹{Number(creditSummary.totalPending || 0).toLocaleString('en-IN')}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#b45309', marginTop: '4px' }}>
+                      {creditSummary.pendingCount || 0} unpaid or partial invoice(s)
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '16px',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                      Settlement Mode
+                    </div>
+                    <div style={{ fontSize: '20px', fontWeight: 700, color: '#0f8c4a', marginTop: '8px' }}>
+                      Cash / UPI
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
+                      Independent from driver daily cash bag
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  {/* Status Pills */}
+                  <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                    {[
+                      { id: 'ALL', label: `All (${creditSummary.totalCount || 0})` },
+                      { id: 'PENDING', label: `Pending (${creditSummary.pendingCount || 0})` },
+                      { id: 'PARTIAL', label: 'Partially Paid' },
+                      { id: 'PAID', label: `Settled (${creditSummary.settledCount || 0})` },
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setCreditStatusFilter(tab.id)}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: creditStatusFilter === tab.id ? '#ffffff' : 'transparent',
+                          color: creditStatusFilter === tab.id ? '#0f172a' : '#64748b',
+                          fontWeight: creditStatusFilter === tab.id ? 700 : 500,
+                          fontSize: '13px',
+                          boxShadow: creditStatusFilter === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search input */}
+                  <form onSubmit={handleCreditSearch} style={{ display: 'flex', gap: '8px', minWidth: '320px' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#94a3b8"
+                        strokeWidth="2"
+                        style={{ position: 'absolute', left: '10px', top: '11px' }}
+                      >
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Search customer, consumer #, driver, voucher..."
+                        value={creditSearchQuery}
+                        onChange={(e) => setCreditSearchQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 32px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '13px',
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: '#0f8c4a',
+                        color: '#ffffff',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Search
+                    </button>
+                  </form>
+                </div>
+
+                {/* Table */}
+                <div className="table-container" style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+                  <table className="cash-in-table" style={{ width: '100%', minWidth: '980px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>DATE & TIME</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>VOUCHER</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>DRIVER</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>CUSTOMER</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>PRODUCT & BATCH</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569', textAlign: 'center' }}>QTY</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>TOTAL</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>SETTLED</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>PENDING</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569', textAlign: 'center' }}>STATUS</th>
+                        <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 700, color: '#475569', textAlign: 'center' }}>ACTION</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {creditLoading ? (
+                        <tr>
+                          <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                            Loading credit sales records...
+                          </td>
+                        </tr>
+                      ) : creditSales.length === 0 ? (
+                        <tr>
+                          <td colSpan="11" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                            No credit sales records found.
+                          </td>
+                        </tr>
+                      ) : (
+                        creditSales.map((sale) => {
+                          const isPaid = sale.status === 'Paid';
+                          const isPartial = sale.status === 'Partially Paid';
+                          const driverInitials = (sale.driverName || 'DR')
+                            .split(' ')
+                            .map((w) => w[0])
+                            .slice(0, 2)
+                            .join('')
+                            .toUpperCase();
+
+                          return (
+                            <tr key={sale.saleId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '12px 14px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 600, color: '#1e293b' }}>{sale.date}</div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>{sale.createdAtFormatted ? sale.createdAtFormatted.split(' ')[1] + ' ' + (sale.createdAtFormatted.split(' ')[2] || '') : ''}</div>
+                              </td>
+                              <td style={{ padding: '12px 14px', fontSize: '13px' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    background: '#e0f2fe',
+                                    color: '#0369a1',
+                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                  }}
+                                >
+                                  {sale.voucherNumber || `VCH-${sale.saleId}`}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div
+                                    style={{
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '50%',
+                                      background: '#3b82f6',
+                                      color: '#fff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {driverInitials}
+                                  </div>
+                                  <div>
+                                    <strong style={{ fontSize: '13px', color: '#1e293b' }}>{sale.driverName}</strong>
+                                    {sale.driverPhone && <div style={{ fontSize: '11px', color: '#64748b' }}>{sale.driverPhone}</div>}
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <div>
+                                  <strong style={{ fontSize: '13px', color: '#0f172a' }}>{sale.customerName}</strong>
+                                  <span
+                                    style={{
+                                      marginLeft: '6px',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      background: '#f1f5f9',
+                                      color: '#475569',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    #{sale.consumerNumber}
+                                  </span>
+                                </div>
+                                {sale.customerPhone && (
+                                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                                    📞 {sale.customerPhone}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                                  {sale.product?.name || 'LPG Cylinder'}
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                                  <span
+                                    style={{
+                                      fontSize: '10px',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      background: sale.product?.type === 'DOMESTIC' ? '#e0f2fe' : '#fef3c7',
+                                      color: sale.product?.type === 'DOMESTIC' ? '#0369a1' : '#b45309',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {sale.product?.type || 'COMMERCIAL'}
+                                  </span>
+                                  {sale.batch?.batchNo && (
+                                    <span style={{ fontSize: '10px', color: '#64748b' }}>
+                                      Batch: {sale.batch.batchNo}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600, fontSize: '13px' }}>
+                                {sale.quantity || 1}
+                              </td>
+                              <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>
+                                ₹{Number(sale.totalAmount || 0).toLocaleString('en-IN')}
+                              </td>
+                              <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '13px', color: '#15803d', fontWeight: 600 }}>
+                                ₹{Number(sale.amountReceived || 0).toLocaleString('en-IN')}
+                              </td>
+                              <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '13px', fontWeight: 800, color: sale.pendingAmount > 0 ? '#dc2626' : '#15803d' }}>
+                                ₹{Number(sale.pendingAmount || 0).toLocaleString('en-IN')}
+                              </td>
+                              <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '4px 10px',
+                                    borderRadius: '999px',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    background: isPaid ? '#dcfce7' : isPartial ? '#fef3c7' : '#fee2e2',
+                                    color: isPaid ? '#15803d' : isPartial ? '#b45309' : '#b91c1c',
+                                  }}
+                                >
+                                  {sale.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  {sale.pendingAmount > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenCreditSettle(sale)}
+                                      style={{
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        background: '#0f8c4a',
+                                        color: '#ffffff',
+                                        fontSize: '12px',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                      }}
+                                    >
+                                      ✓ Settle
+                                    </button>
+                                  ) : (
+                                    <span style={{ fontSize: '12px', color: '#15803d', fontWeight: 600, padding: '6px 0' }}>
+                                      Settled
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenCreditHistory(sale)}
+                                    title="View Payment History"
+                                    style={{
+                                      padding: '6px 10px',
+                                      borderRadius: '8px',
+                                      border: '1px solid #cbd5e1',
+                                      background: '#f8fafc',
+                                      color: '#475569',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    History
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
           </div>
 
           {isProductModalOpen && (
@@ -2208,6 +2808,465 @@ function CashIn() {
                       style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#48bb78', color: '#fff', cursor: 'pointer', fontWeight: 500 }}
                     >+ Add to sale</button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Credit Sale Settlement Modal */}
+          {isCreditSettleModalOpen && selectedCreditSale && (
+            <div
+              className="credit-settle-modal-overlay"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#fff',
+                  borderRadius: '12px',
+                  width: '90%',
+                  maxWidth: '560px',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+                }}
+              >
+                {/* Header */}
+                <div
+                  style={{
+                    backgroundColor: '#0f8c4a',
+                    color: '#fff',
+                    padding: '16px 24px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', opacity: 0.9 }}>
+                      CREDIT SALE SETTLEMENT
+                    </div>
+                    <h2 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: 700 }}>
+                      Settle {selectedCreditSale.voucherNumber || `VCH-${selectedCreditSale.saleId}`}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreditSettleModalOpen(false)}
+                    style={{
+                      background: 'rgba(255,255,255,0.2)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '32px',
+                      height: '32px',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Body */}
+                <form onSubmit={handleConfirmCreditSettle} style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+                  {/* Summary card */}
+                  <div
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '14px',
+                      marginBottom: '18px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                          {selectedCreditSale.customerName}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                          Consumer #{selectedCreditSale.consumerNumber} · Driver: {selectedCreditSale.driverName}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                          {selectedCreditSale.product?.name} (Qty: {selectedCreditSale.quantity})
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>{selectedCreditSale.date}</div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: '8px',
+                        paddingTop: '10px',
+                        borderTop: '1px solid #e2e8f0',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Total Amount</div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                          ₹{Number(selectedCreditSale.totalAmount).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Already Settled</div>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#15803d' }}>
+                          ₹{Number(selectedCreditSale.amountReceived).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 700 }}>Pending Balance</div>
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#dc2626' }}>
+                          ₹{Number(selectedCreditSale.pendingAmount).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Mode Selector: strictly Cash or UPI */}
+                  <div style={{ marginBottom: '18px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>
+                      Settlement Payment Method
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setCreditSettlePaymentMethod('CASH')}
+                        style={{
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: creditSettlePaymentMethod === 'CASH' ? '2px solid #0f8c4a' : '1px solid #d1d5db',
+                          background: creditSettlePaymentMethod === 'CASH' ? '#f0fdf4' : '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ fontSize: '20px' }}>💵</span>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: creditSettlePaymentMethod === 'CASH' ? '#15803d' : '#374151' }}>
+                            Cash
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>Physical cash received</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCreditSettlePaymentMethod('UPI')}
+                        style={{
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: creditSettlePaymentMethod === 'UPI' ? '2px solid #0f8c4a' : '1px solid #d1d5db',
+                          background: creditSettlePaymentMethod === 'UPI' ? '#f0fdf4' : '#ffffff',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ fontSize: '20px' }}>📱</span>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: creditSettlePaymentMethod === 'UPI' ? '#15803d' : '#374151' }}>
+                            UPI / Online
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>GPay, PhonePe, QR</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Settlement Amount */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>
+                        Amount to Settle (₹)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setCreditSettleAmount(String(selectedCreditSale.pendingAmount))}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0f8c4a',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        Pay Full Pending (₹{Number(selectedCreditSale.pendingAmount).toLocaleString('en-IN')})
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      step="any"
+                      min="1"
+                      max={selectedCreditSale.pendingAmount}
+                      value={creditSettleAmount}
+                      onChange={(e) => setCreditSettleAmount(e.target.value)}
+                      required
+                      placeholder="Enter amount"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                      }}
+                    />
+                  </div>
+
+                  {/* Payment Date */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                      Settlement Date
+                    </label>
+                    <input
+                      type="date"
+                      value={creditSettleDate}
+                      onChange={(e) => setCreditSettleDate(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        fontSize: '14px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                      }}
+                    />
+                  </div>
+
+                  {/* Notes / Reference */}
+                  <div style={{ marginBottom: '18px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#374151', marginBottom: '6px' }}>
+                      Notes / Reference (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. UPI Ref # or receipt remarks"
+                      value={creditSettleNotes}
+                      onChange={(e) => setCreditSettleNotes(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        fontSize: '14px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                      }}
+                    />
+                  </div>
+
+                  {/* Error & Success alerts */}
+                  {creditSettleError && (
+                    <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#fee2e2', color: '#b91c1c', fontSize: '13px', marginBottom: '16px' }}>
+                      ⚠️ {creditSettleError}
+                    </div>
+                  )}
+                  {creditSettleSuccess && (
+                    <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#dcfce7', color: '#15803d', fontSize: '13px', marginBottom: '16px' }}>
+                      ✓ {creditSettleSuccess}
+                    </div>
+                  )}
+
+                  {/* Footer actions */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreditSettleModalOpen(false)}
+                      disabled={creditSettleSubmitting}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        background: '#fff',
+                        color: '#374151',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={creditSettleSubmitting}
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: '#0f8c4a',
+                        color: '#fff',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: creditSettleSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: creditSettleSubmitting ? 0.7 : 1,
+                      }}
+                    >
+                      {creditSettleSubmitting ? 'Recording Settlement...' : 'Confirm Settlement'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Payment History Modal */}
+          {isCreditHistoryModalOpen && selectedCreditSale && (
+            <div
+              className="credit-history-modal-overlay"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#fff',
+                  borderRadius: '12px',
+                  width: '90%',
+                  maxWidth: '540px',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: '#1e293b',
+                    color: '#fff',
+                    padding: '16px 20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                      Payment History – {selectedCreditSale.voucherNumber || `VCH-${selectedCreditSale.saleId}`}
+                    </h3>
+                    <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '2px' }}>
+                      Customer: {selectedCreditSale.customerName} · Total: ₹{Number(selectedCreditSale.totalAmount).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreditHistoryModalOpen(false)}
+                    style={{
+                      background: 'rgba(255,255,255,0.2)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      color: '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+                  {creditHistoryLoading ? (
+                    <div style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>Loading history...</div>
+                  ) : creditHistoryError ? (
+                    <div style={{ color: '#dc2626', textAlign: 'center', padding: '16px' }}>{creditHistoryError}</div>
+                  ) : creditPaymentHistory.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px', color: '#64748b', fontSize: '13px' }}>
+                      No settlements recorded yet for this credit sale.
+                    </div>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                          <th style={{ padding: '8px 10px', fontWeight: 600, color: '#475569' }}>DATE</th>
+                          <th style={{ padding: '8px 10px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>AMOUNT</th>
+                          <th style={{ padding: '8px 10px', fontWeight: 600, color: '#475569', textAlign: 'center' }}>MODE</th>
+                          <th style={{ padding: '8px 10px', fontWeight: 600, color: '#475569' }}>NOTES</th>
+                          <th style={{ padding: '8px 10px', fontWeight: 600, color: '#475569' }}>RECORDED BY</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {creditPaymentHistory.map((p) => (
+                          <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '10px', fontWeight: 500 }}>{p.paymentDate}</td>
+                            <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
+                              ₹{Number(p.amount).toLocaleString('en-IN')}
+                            </td>
+                            <td style={{ padding: '10px', textAlign: 'center' }}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  background: p.paymentMethod === 'UPI' ? '#e0f2fe' : '#f0fdf4',
+                                  color: p.paymentMethod === 'UPI' ? '#0369a1' : '#15803d',
+                                }}
+                              >
+                                {p.paymentMethod}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px', color: '#64748b' }}>{p.notes || '—'}</td>
+                            <td style={{ padding: '10px', color: '#64748b' }}>{p.recordedBy || 'Cashier'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreditHistoryModalOpen(false)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
