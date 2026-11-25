@@ -3,8 +3,18 @@ import { NavLink } from 'react-router-dom';
 import logo from '../../assets/logo.svg';
 
 const CASH_DAY_CLOSED_KEY = 'cashier_day_closed';
+const AUTH_USER_KEY = 'cashier_auth_user';
 
 const readCashDayClosedState = () => localStorage.getItem(CASH_DAY_CLOSED_KEY) === 'true';
+
+const readAgencyName = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem(AUTH_USER_KEY) || '{}');
+    return user.agency_name || user.company_name || 'Agency';
+  } catch {
+    return 'Agency';
+  }
+};
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: 'dashboard' },
@@ -83,6 +93,7 @@ const iconMap = {
 
 function Sidebar() {
   const [isCashDayClosed, setIsCashDayClosed] = useState(readCashDayClosedState());
+  const [agencyName, setAgencyName] = useState(readAgencyName());
 
   useEffect(() => {
     const handleCashDayStateChanged = () => {
@@ -98,6 +109,14 @@ function Sidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleSessionChanged = () => setAgencyName(readAgencyName());
+
+    window.addEventListener('storage', handleSessionChanged);
+
+    return () => window.removeEventListener('storage', handleSessionChanged);
+  }, []);
+
   const isLockedNavItem = (path) =>
     isCashDayClosed && (path === '/cash-in' || path === '/cash-out');
 
@@ -110,7 +129,7 @@ function Sidebar() {
             {/* <img src={logo} alt="Cashflow logo" /> */}
           </div>
           <div>
-            <span className="brand-name">Suraj Gas Agency</span>
+            <span className="brand-name">{agencyName}</span>
 
             <p className="brand-name">CASHIER</p>
             <p></p>
