@@ -710,12 +710,8 @@ function CashIn() {
 
   const drivers = driverCollections.length
     ? driverCollections.map((driver) => {
-        const count =
-          driver.status === 'Pending'
-            ? driver.pendingCount
-            : driver.status === 'Assigned'
-            ? driver.assignedCount
-            : driver.settledCount;
+        const deliveriesCount = Number(driver.totalDeliveries ?? 0);
+        const cylindersCount = Number(driver.totalCylinders ?? deliveriesCount);
 
         return {
           initials: driver.driverName
@@ -724,8 +720,10 @@ function CashIn() {
             .join('')
             .slice(0, 2),
           name: driver.driverName,
-          route: `${count || 0} Deliveries`,
-          cylinders: `${(count || 0) * 2} cylinders`,
+          route: `${deliveriesCount} ${deliveriesCount === 1 ? 'Delivery' : 'Deliveries'}`,
+          totalDeliveries: deliveriesCount,
+          totalCylinders: cylindersCount,
+          cylinders: `${cylindersCount} ${cylindersCount === 1 ? 'cylinder' : 'cylinders'}`,
           cash: driver.cash,
           upi: driver.upi,
           total: driver.total,
@@ -1156,7 +1154,11 @@ function CashIn() {
                             </div>
                             <div>
                               <h2 style={{ margin: 0, fontSize: '20px' }}>{selectedDriverDetails.name}</h2>
-                              <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>{selectedDriverDetails.cylinders} cylinders</p>
+                              <p style={{ margin: 0, fontSize: '13px', opacity: 0.9 }}>
+                                {selectedDriverDetails.totalCylinders !== undefined
+                                  ? `${selectedDriverDetails.totalCylinders} ${selectedDriverDetails.totalCylinders === 1 ? 'cylinder' : 'cylinders'}`
+                                  : selectedDriverDetails.route}
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -1294,17 +1296,82 @@ function CashIn() {
                           </div>
                         </div>
 
-                        {/* SECTION 2: Consumer-Wise Details (Separate Cash Collections & Online Sales) */}
+                        {/* SECTION 2: Consumer-Wise Details (Separate Cash, UPI & Online Sales) */}
                         {(() => {
                           const currentItem = collectionHistory?.items?.[0];
                           const allTxs = currentItem?.transactions || [];
-                          const cashTxs = currentItem?.cashTransactions || allTxs.filter((t) => !t.isOnline && t.paymentMode === 'CASH');
-                          const onlineTxs = currentItem?.onlineTransactions || allTxs.filter((t) => t.isOnline || ['UPI', 'ONLINE', 'CARD'].includes(t.paymentMode));
+                          const getMode = (t) => String(t?.paymentMode || '').toUpperCase();
+                          const cashTxs =
+                            currentItem?.cashTransactions ||
+                            allTxs.filter((t) => !t.isOnline && getMode(t) === 'CASH');
+                          const upiTxs =
+                            currentItem?.upiTransactions ||
+                            allTxs.filter((t) => getMode(t) === 'UPI');
+                          const onlineTxs =
+                            currentItem?.iocOnlineTransactions ||
+                            allTxs.filter((t) =>
+                              ['ONLINE', 'CARD', 'NET_BANKING'].includes(getMode(t))
+                            );
 
                           const cashTotal = cashTxs.reduce((s, t) => s + (t.amount || 0), 0);
+                          const upiTotal = upiTxs.reduce((s, t) => s + (t.amount || 0), 0);
                           const onlineTotal = onlineTxs.reduce((s, t) => s + (t.amount || 0), 0);
 
-                          const displayTxs = driverModalTab === 'cash' ? cashTxs : driverModalTab === 'online' ? onlineTxs : allTxs;
+                          const displayTxs =
+                            driverModalTab === 'cash'
+                              ? cashTxs
+                              : driverModalTab === 'upi'
+                              ? upiTxs
+                              : driverModalTab === 'online'
+                              ? onlineTxs
+                              : allTxs;
+
+                          const modalTabs = [
+                            {
+                              id: 'cash',
+                              label: `💵 Cash Collections (${cashTxs.length}) · ₹${cashTotal.toLocaleString('en-IN')}`,
+                              activeBg: '#16a34a',
+                            },
+                            {
+                              id: 'upi',
+                              label: `📱 UPI Sales (${upiTxs.length}) · ₹${upiTotal.toLocaleString('en-IN')}`,
+                              activeBg: '#7c3aed',
+                            },
+                            {
+                              id: 'online',
+                              label: `🌐 Online Sales (${onlineTxs.length}) · ₹${onlineTotal.toLocaleString('en-IN')}`,
+                              activeBg: '#0284c7',
+                            },
+                            {
+                              id: 'all',
+                              label: `All (${allTxs.length})`,
+                              activeBg: '#475569',
+                            },
+                          ];
+
+                          const tabMeta = {
+                            cash: {
+                              totalLabel: 'Cash Collections',
+                              totalColor: '#16a34a',
+                              emptyText: 'No cash transactions for this driver.',
+                            },
+                            upi: {
+                              totalLabel: 'UPI Sales',
+                              totalColor: '#7c3aed',
+                              emptyText: 'No UPI transactions for this driver.',
+                            },
+                            online: {
+                              totalLabel: 'Online Sales',
+                              totalColor: '#0284c7',
+                              emptyText: 'No online transactions for this driver.',
+                            },
+                            all: {
+                              totalLabel: 'All Sales',
+                              totalColor: '#0284c7',
+                              emptyText: 'No transactions found.',
+                            },
+                          };
+                          const activeMeta = tabMeta[driverModalTab] || tabMeta.all;
 
                           return (
                             <div>
@@ -1314,66 +1381,36 @@ function CashIn() {
                                     Consumer-Wise Delivery Transactions
                                   </h3>
                                   <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
-                                    Cash and online sales are displayed separately to avoid mixing collections
+                                    Cash, UPI, and online sales are displayed separately to avoid mixing collections
                                   </p>
                                 </div>
 
                                 {/* Section Switch Tabs */}
-                                <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setDriverModalTab('cash')}
-                                    style={{
-                                      padding: '6px 14px',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      fontSize: '12px',
-                                      fontWeight: 600,
-                                      cursor: 'pointer',
-                                      background: driverModalTab === 'cash' ? '#16a34a' : 'transparent',
-                                      color: driverModalTab === 'cash' ? '#fff' : '#475569',
-                                      boxShadow: driverModalTab === 'cash' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                      transition: 'all 0.15s ease',
-                                    }}
-                                  >
-                                    💵 Cash Collections ({cashTxs.length}) · ₹{cashTotal.toLocaleString('en-IN')}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setDriverModalTab('online')}
-                                    style={{
-                                      padding: '6px 14px',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      fontSize: '12px',
-                                      fontWeight: 600,
-                                      cursor: 'pointer',
-                                      background: driverModalTab === 'online' ? '#0284c7' : 'transparent',
-                                      color: driverModalTab === 'online' ? '#fff' : '#475569',
-                                      boxShadow: driverModalTab === 'online' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                      transition: 'all 0.15s ease',
-                                    }}
-                                  >
-                                    🌐 Online Sales ({onlineTxs.length}) · ₹{onlineTotal.toLocaleString('en-IN')}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setDriverModalTab('all')}
-                                    style={{
-                                      padding: '6px 14px',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      fontSize: '12px',
-                                      fontWeight: 600,
-                                      cursor: 'pointer',
-                                      background: driverModalTab === 'all' ? '#475569' : 'transparent',
-                                      color: driverModalTab === 'all' ? '#fff' : '#475569',
-                                      boxShadow: driverModalTab === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                      transition: 'all 0.15s ease',
-                                    }}
-                                  >
-                                    All ({allTxs.length})
-                                  </button>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+                                  {modalTabs.map((tab) => {
+                                    const isActive = driverModalTab === tab.id;
+                                    return (
+                                      <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setDriverModalTab(tab.id)}
+                                        style={{
+                                          padding: '6px 14px',
+                                          border: 'none',
+                                          borderRadius: '6px',
+                                          fontSize: '12px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          background: isActive ? tab.activeBg : 'transparent',
+                                          color: isActive ? '#fff' : '#475569',
+                                          boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                          transition: 'all 0.15s ease',
+                                        }}
+                                      >
+                                        {tab.label}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
 
@@ -1383,10 +1420,15 @@ function CashIn() {
                                   <span>💵</span>
                                   <span>Showing <strong>Cash collections only</strong>. Physical cash expected from driver: <strong>₹{cashTotal.toLocaleString('en-IN')}</strong>.</span>
                                 </div>
+                              ) : driverModalTab === 'upi' ? (
+                                <div style={{ marginBottom: '12px', padding: '8px 14px', borderRadius: '6px', background: '#f5f3ff', border: '1px solid #ddd6fe', fontSize: '12px', color: '#6d28d9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span>📱</span>
+                                  <span>Showing <strong>UPI sales only</strong>. Collected digitally via UPI — Total: <strong>₹{upiTotal.toLocaleString('en-IN')}</strong>.</span>
+                                </div>
                               ) : driverModalTab === 'online' ? (
                                 <div style={{ marginBottom: '12px', padding: '8px 14px', borderRadius: '6px', background: '#f0f9ff', border: '1px solid #bae6fd', fontSize: '12px', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span>🌐</span>
-                                  <span>Showing <strong>Online sales only</strong>. Processed digitally via UPI/Payment Gateway — do NOT collect as cash from driver. Total: <strong>₹{onlineTotal.toLocaleString('en-IN')}</strong>.</span>
+                                  <span>Showing <strong>Online sales only</strong>. Processed digitally via Payment Gateway / IOC Online — do NOT collect as cash from driver. Total: <strong>₹{onlineTotal.toLocaleString('en-IN')}</strong>.</span>
                                 </div>
                               ) : null}
 
@@ -1409,73 +1451,82 @@ function CashIn() {
                                     ) : displayTxs.length === 0 ? (
                                       <tr>
                                         <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
-                                          {driverModalTab === 'cash' ? 'No cash transactions for this driver.' : driverModalTab === 'online' ? 'No online transactions for this driver.' : 'No transactions found.'}
+                                          {activeMeta.emptyText}
                                         </td>
                                       </tr>
                                     ) : (
-                                      displayTxs.map((tx, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                          <td style={{ padding: '12px 14px', color: '#0052cc', fontWeight: 600 }}>
-                                            B-{tx.saleId}
-                                          </td>
-                                          <td style={{ padding: '12px 14px' }}>
-                                            <div style={{ fontWeight: 600, color: '#1e293b' }}>{tx.customerName}</div>
-                                            {tx.consumerNumber && (
-                                              <div style={{ fontSize: '11px', color: '#64748b' }}>No: {tx.consumerNumber}</div>
-                                            )}
-                                            {tx.customerPhone && (
-                                              <div style={{ fontSize: '11px', color: '#64748b' }}>📞 {tx.customerPhone}</div>
-                                            )}
-                                          </td>
-                                          <td style={{ padding: '12px 14px' }}>
-                                            {tx.items && tx.items.length > 0 ? (
-                                              tx.items.map((it, itemIdx) => (
-                                                <div key={itemIdx} style={{ fontSize: '12px', color: '#334155', marginBottom: '2px' }}>
-                                                  <span style={{ fontWeight: 600 }}>{it.productName}</span>: {it.quantity} × ₹{it.rate}
+                                      displayTxs.map((tx, idx) => {
+                                        const modeUpper = getMode(tx);
+                                        const badgeStyle =
+                                          modeUpper === 'CASH'
+                                            ? { backgroundColor: '#dcfce7', color: '#15803d' }
+                                            : modeUpper === 'UPI'
+                                            ? { backgroundColor: '#ede9fe', color: '#6d28d9' }
+                                            : { backgroundColor: '#e0f2fe', color: '#0369a1' };
+
+                                        return (
+                                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '12px 14px', color: '#0052cc', fontWeight: 600 }}>
+                                              B-{tx.saleId}
+                                            </td>
+                                            <td style={{ padding: '12px 14px' }}>
+                                              <div style={{ fontWeight: 600, color: '#1e293b' }}>{tx.customerName}</div>
+                                              {tx.consumerNumber && (
+                                                <div style={{ fontSize: '11px', color: '#64748b' }}>No: {tx.consumerNumber}</div>
+                                              )}
+                                              {tx.customerPhone && (
+                                                <div style={{ fontSize: '11px', color: '#64748b' }}>📞 {tx.customerPhone}</div>
+                                              )}
+                                            </td>
+                                            <td style={{ padding: '12px 14px' }}>
+                                              {tx.items && tx.items.length > 0 ? (
+                                                tx.items.map((it, itemIdx) => (
+                                                  <div key={itemIdx} style={{ fontSize: '12px', color: '#334155', marginBottom: '2px' }}>
+                                                    <span style={{ fontWeight: 600 }}>{it.productName}</span>: {it.quantity} × ₹{it.rate}
+                                                  </div>
+                                                ))
+                                              ) : (
+                                                <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                                  {tx.domQty > 0 ? `14.2kg Domestic: ${tx.domQty}` : ''}
+                                                  {tx.comQty > 0 ? ` · 19kg Commercial: ${tx.comQty}` : ''}
+                                                  {!tx.domQty && !tx.comQty ? `Items: ${tx.itemsQty || 1}` : ''}
                                                 </div>
-                                              ))
-                                            ) : (
-                                              <div style={{ fontSize: '12px', color: '#64748b' }}>
-                                                {tx.domQty > 0 ? `14.2kg Domestic: ${tx.domQty}` : ''}
-                                                {tx.comQty > 0 ? ` · 19kg Commercial: ${tx.comQty}` : ''}
-                                                {!tx.domQty && !tx.comQty ? `Items: ${tx.itemsQty || 1}` : ''}
-                                              </div>
-                                            )}
-                                          </td>
-                                          <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600 }}>
-                                            {(tx.items && tx.items.length > 0)
-                                              ? tx.items.reduce((s, it) => s + (it.quantity || 0), 0)
-                                              : (tx.domQty || 0) + (tx.comQty || 0) + (tx.itemsQty || 0)}
-                                          </td>
-                                          <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
-                                            ₹{tx.amount.toLocaleString('en-IN')}
-                                          </td>
-                                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                            <span style={{
-                                              padding: '3px 8px',
-                                              borderRadius: '4px',
-                                              fontSize: '11px',
-                                              fontWeight: 600,
-                                              backgroundColor: tx.paymentMode === 'CASH' ? '#dcfce7' : '#e0f2fe',
-                                              color: tx.paymentMode === 'CASH' ? '#15803d' : '#0369a1',
-                                            }}>
-                                              {tx.paymentMode === 'CASH' ? 'Cash' : tx.paymentMode}
-                                            </span>
-                                          </td>
-                                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                                            <span className={`status-badge ${(tx.status || 'pending').toLowerCase()}`}>
-                                              {tx.status || 'Pending'}
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      ))
+                                              )}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 600 }}>
+                                              {(tx.items && tx.items.length > 0)
+                                                ? tx.items.reduce((s, it) => s + (it.quantity || 0), 0)
+                                                : (tx.domQty || 0) + (tx.comQty || 0) + (tx.itemsQty || 0)}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                                              ₹{tx.amount.toLocaleString('en-IN')}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                              <span style={{
+                                                padding: '3px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                ...badgeStyle,
+                                              }}>
+                                                {modeUpper === 'CASH' ? 'Cash' : tx.paymentMode}
+                                              </span>
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                              <span className={`status-badge ${(tx.status || 'pending').toLowerCase()}`}>
+                                                {tx.status || 'Pending'}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })
                                     )}
                                   </tbody>
                                   {displayTxs.length > 0 && (
                                     <tfoot>
                                       <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 700 }}>
                                         <td colSpan="3" style={{ padding: '12px 14px' }}>
-                                          Total for {driverModalTab === 'cash' ? 'Cash Collections' : driverModalTab === 'online' ? 'Online Sales' : 'All Sales'} ({displayTxs.length} orders)
+                                          Total for {activeMeta.totalLabel} ({displayTxs.length} orders)
                                         </td>
                                         <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                           {displayTxs.reduce((sum, tx) => {
@@ -1485,7 +1536,7 @@ function CashIn() {
                                             return sum + (tx.domQty || 0) + (tx.comQty || 0) + (tx.itemsQty || 0);
                                           }, 0)}
                                         </td>
-                                        <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '15px', color: driverModalTab === 'cash' ? '#16a34a' : '#0284c7' }}>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', fontSize: '15px', color: activeMeta.totalColor }}>
                                           ₹{displayTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0).toLocaleString('en-IN')}
                                         </td>
                                         <td colSpan="2"></td>
@@ -1516,7 +1567,7 @@ function CashIn() {
                         <div>
                           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Pending amount breakdown</h2>
                           <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#666' }}>
-                            {pendingModalDriver.name} · Route {pendingModalDriver.route.split(' ')[0]} — unsettled amounts by sale date
+                            {pendingModalDriver.name} · {pendingModalDriver.route} — unsettled amounts by sale date
                           </p>
                         </div>
                         <button 
